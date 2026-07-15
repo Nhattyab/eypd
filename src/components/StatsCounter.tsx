@@ -192,7 +192,6 @@ export default function StatsCounter() {
                 {/* Background image container that expands and reveals on hover */}
                 <div 
                   className="absolute inset-0 bg-cover bg-center opacity-0 group-hover:opacity-100 scale-110 group-hover:scale-100 transition-all duration-500 ease-out"
-                  style={{ backgroundImage: `url('${stat.bgImage}')` }}
                 />
                 
                 {/* Dark slate color filter for visual compliance and high text contrast */}

@@ -161,6 +161,19 @@ export default function Values() {
             {/* Carousel Container */}
             <div className="relative overflow-hidden py-2" id="events-carousel-wrapper">
               <motion.div
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(event, info) => {
+                  const swipeThreshold = 50;
+                  if (info.offset.x < -swipeThreshold) {
+                    // Swiped left -> Next slide
+                    setStartIndex((prev) => Math.min(prev + 1, maxIndex));
+                  } else if (info.offset.x > swipeThreshold) {
+                    // Swiped right -> Previous slide
+                    setStartIndex((prev) => Math.max(prev - 1, 0));
+                  }
+                }}
                 animate={{ x: `-${startIndex * (isMobile ? 100 : 50)}%` }}
                 transition={{ type: "spring", stiffness: 220, damping: 26 }}
                 className="flex"

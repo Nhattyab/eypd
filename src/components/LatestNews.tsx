@@ -5,9 +5,10 @@ import { motion } from "motion/react";
 interface LatestNewsProps {
   posts: BlogPost[];
   onPostClick: (post: BlogPost) => void;
+  onViewAllNews?: () => void;
 }
 
-export default function LatestNews({ posts, onPostClick }: LatestNewsProps) {
+export default function LatestNews({ posts, onPostClick, onViewAllNews }: LatestNewsProps) {
   return (
     <section className="py-10 bg-white" id="blog">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -22,14 +23,22 @@ export default function LatestNews({ posts, onPostClick }: LatestNewsProps) {
               Read Our Latest News & Global Updates
             </h2>
             <p className="text-sm text-text-muted font-sans max-w-xl">
-              We provide periodic, transparent journals covering on-the-ground volunteer tasks, clean sanitation launches, and impact reports.
+              We provide periodic, transparent journals covering on-the-ground volunteer tasks, project launches, and impact reports.
             </p>
           </div>
 
-          <button className="flex items-center gap-2 text-primary hover:text-secondary font-display font-bold text-sm transition-colors border-b-2 border-primary hover:border-secondary pb-1 self-start md:self-end">
+          <a
+            href="/blog"
+            onClick={(e) => {
+              e.preventDefault();
+              if (onViewAllNews) onViewAllNews();
+            }}
+            className="flex items-center gap-2 text-primary hover:text-secondary font-display font-bold text-sm transition-colors border-b-2 border-primary hover:border-secondary pb-1 self-start md:self-end cursor-pointer"
+          >
             <span>View All News</span>
             <ArrowRight className="w-4 h-4" />
-          </button>
+          </a>
+          
         </div>
 
         {/* Blog Post Grid */}

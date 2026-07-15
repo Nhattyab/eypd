@@ -43,7 +43,7 @@ export default function DonationWidget({ onDonateSubmit }: DonationWidgetProps) 
 
   return (
     <div
-      className="bg-white rounded-3xl shadow-xl overflow-hidden border border-border-main"
+      className="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-border-main"
       id="donation-widget-card"
     >
       <div className="grid grid-cols-1 lg:grid-cols-2">
@@ -51,10 +51,10 @@ export default function DonationWidget({ onDonateSubmit }: DonationWidgetProps) 
         <div className="p-8 sm:p-10 bg-gradient-to-r from-[#111e38] via-[#10352c] via-[#0e4d2d] to-[#111e38] z-0 text-white flex flex-col justify-between" id="donation-widget-left">
           <div>
             <span className="inline-block bg-primary/20 text-primary border border-primary/30 text-xs font-display font-semibold uppercase px-3 py-1 rounded-full mb-3">
-              Give Today
+              Make a Donation
             </span>
             <h3 className="text-2xl font-display font-extrabold text-white mb-6 leading-tight">
-              Custom Donate Now
+              Choose an amount 
             </h3>
 
             {/* Quick Select Grid */}
@@ -94,19 +94,18 @@ export default function DonationWidget({ onDonateSubmit }: DonationWidgetProps) 
 
               <button
                 type="submit"
-                disabled={(selectedAmount === null && !customAmount)}
+                disabled
+                // disabled={(selectedAmount === null && !customAmount)}
                 className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/95 disabled:opacity-50 disabled:hover:bg-primary text-white font-display font-bold py-3.5 px-6 rounded-xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-primary/10"
                 id="submit-donation-btn"
               >
-                <Heart className="w-4 h-4 fill-white" />
                 <span>Donate Now</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           </div>
-
           <p className="text-xs text-white/50 mt-6 leading-relaxed">
-            * All contributions are tax-deductible. A detailed donation certificate will be sent to your email.
+            🔒 Secure · Tax receipt provided · All currencies accepted
           </p>
         </div>
 
@@ -114,13 +113,13 @@ export default function DonationWidget({ onDonateSubmit }: DonationWidgetProps) 
         <div className="p-8 sm:p-10 bg-surface-main flex flex-col justify-between" id="donation-widget-right">
           <div>
             <span className="inline-block bg-accent/20 text-accent border border-accent/30 text-xs font-display font-semibold uppercase px-3 py-1 rounded-full mb-3">
-              Active Project
+              Support Our Work
             </span>
             <h3 className="text-2xl font-display font-extrabold text-secondary mb-4 leading-tight">
-              Support Children by Raising Vital Funds
+              Your Support Moves Ethiopia Forward
             </h3>
             <p className="text-sm text-text-muted mb-6 leading-relaxed">
-              We need your support to reach our target for child medical kits and daily lunches. Every dollar counts toward saving lives.
+              Every contribution directly funds youth leadership programs, peace initiatives, livelihoods support, and community resilience work across Ethiopia.
             </p>
 
             {/* Progress Container */}
@@ -162,29 +161,6 @@ export default function DonationWidget({ onDonateSubmit }: DonationWidgetProps) 
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3 pt-6 border-t border-border-main mt-6" id="donation-badge-group">
-            <div className="flex -space-x-2">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100"
-                alt="Donor"
-                className="w-7 h-7 rounded-full border-2 border-white object-cover"
-                referrerPolicy="no-referrer"
-              />
-              <img
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100"
-                alt="Donor"
-                className="w-7 h-7 rounded-full border-2 border-white object-cover"
-                referrerPolicy="no-referrer"
-              />
-              <div className="w-7 h-7 rounded-full bg-primary text-white text-[10px] font-display font-extrabold flex items-center justify-center border-2 border-white">
-                +4K
-              </div>
-            </div>
-            <span className="text-xs text-text-muted font-display font-medium">
-              Join thousands of global advocates
-            </span>
           </div>
         </div>
       </div>

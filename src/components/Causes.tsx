@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Campaign } from "../types";
-import { Heart, ArrowUpRight } from "lucide-react";
+import { Heart, ArrowUpRight, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 // @ts-ignore
@@ -15,28 +15,32 @@ import img4 from "../assets/images/child_eating_bowl_1782474654974.jpg";
 interface CausesProps {
   campaigns: Campaign[];
   onDonateClick: (campaign: Campaign) => void;
+  onViewAllProjects?: () => void;
 }
 
-export default function Causes({ campaigns, onDonateClick }: CausesProps) {
+export default function Causes({ campaigns, onDonateClick, onViewAllProjects }: CausesProps) {
   const [startIndex, setStartIndex] = useState(0);
-  const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const [device, setDevice] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      if (window.innerWidth < 640) {
+        setDevice("mobile");
+      } else if (window.innerWidth < 1024) {
+        setDevice("tablet");
+      } else {
+        setDevice("desktop");
+      }
+    };
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const getVisibleCount = () => {
-    if (windowWidth < 640) return 1; // mobile
-    if (windowWidth < 1024) return 2; // tablet
-    return 3; // large desktop
-  };
-
-  const visibleCount = getVisibleCount();
+  const visibleCount = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
   const maxIndex = Math.max(0, campaigns.length - visibleCount);
 
- // Clamp index if visible count changes
+  // Clamp index if visible count changes
   useEffect(() => {
     if (startIndex > maxIndex) {
       setStartIndex(maxIndex);
@@ -59,7 +63,7 @@ export default function Causes({ campaigns, onDonateClick }: CausesProps) {
   const imagesList = [img1, img2, img3, img4];
   const mappedCampaigns = campaigns.map((camp, index) => ({
     ...camp,
-    image: imagesList[index % imagesList.length] || camp.image,
+    image: camp.image || imagesList[index % imagesList.length],
   }));
 
   return (
@@ -82,7 +86,6 @@ export default function Causes({ campaigns, onDonateClick }: CausesProps) {
 
           {/* Active Donors Badge & Slider Controls */}
           <div className="flex flex-wrap items-center gap-6 self-start md:self-end">
-
             {/* Carousel Navigation Controls */}
             <div className="flex items-center gap-3" id="causes-nav-controls">
               <button
@@ -106,11 +109,28 @@ export default function Causes({ campaigns, onDonateClick }: CausesProps) {
         </div>
 
         {/* Carousel Window Container */}
-        <div className="overflow-hidden w-full relative" id="causes-carousel-window">
+        <div className="overflow-hidden w-full relative  -mx-4 px-4" id="causes-carousel-window">
           <motion.div
-            className="flex gap-8 w-full"
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={(event, info) => {
+              const swipeThreshold = 50;
+              if (info.offset.x < -swipeThreshold) {
+                // Swiped left -> Next slide
+                if (startIndex < maxIndex) {
+                  setStartIndex((prev) => prev + 1);
+                }
+              } else if (info.offset.x > swipeThreshold) {
+                // Swiped right -> Previous slide
+                if (startIndex > 0) {
+                  setStartIndex((prev) => prev - 1);
+                }
+              }
+            }}
+            className="flex w-full cursor-grab active:cursor-grabbing touch-pan-y"
             animate={{
-              x: `-${startIndex * (100 / visibleCount + (visibleCount > 1 ? 1.5 : 0))}%`,
+              x: `-${startIndex * (100 / visibleCount)}%`,
             }}
             transition={{
               type: "spring",
@@ -123,7 +143,7 @@ export default function Causes({ campaigns, onDonateClick }: CausesProps) {
               return (
                 <div
                   key={camp.id}
-                  className="w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)] xl:w-[calc(25%-24px)] shrink-0"
+                  className="w-full sm:w-1/2 lg:w-1/3 shrink-0 px-4"
                   id={`cause-carousel-item-${camp.id}`}
                 >
                   <motion.div
@@ -140,9 +160,9 @@ export default function Causes({ campaigns, onDonateClick }: CausesProps) {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
                       />
-                      {/* Foods Category Overlay Label */}
+                      {/* Category Overlay Label */}
                       <span className="absolute top-4 left-4 bg-[#478b1b] text-white text-[11px] font-sans font-extrabold uppercase px-4 py-1.5 rounded-md shadow-sm tracking-wide">
-                        Foods
+                        {camp.category}
                       </span>
                     </div>
 
@@ -165,6 +185,24 @@ export default function Causes({ campaigns, onDonateClick }: CausesProps) {
             })}
           </motion.div>
         </div>
+
+        {/* Centered "View All Projects" Button/Link */}
+        {onViewAllProjects && (
+          <div className="flex justify-center mt-12" id="causes-view-all-container">
+            <a
+              href="/projects"
+              onClick={(e) => {
+                e.preventDefault();
+                onViewAllProjects();
+              }}
+              className="inline-flex items-center gap-2.5 bg-[#478b1b] hover:bg-[#478b1b]/95 text-white font-sans font-extrabold text-sm sm:text-base px-8 py-4 rounded-[20px] shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
+              id="causes-view-all-btn"
+            >
+              <span>View All Projects</span>
+              <ArrowUpRight className="w-5 h-5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-200" />
+            </a>
+          </div>
+        )}
       </div>
     </section>
   );

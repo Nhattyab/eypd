@@ -31,6 +31,13 @@ export const campaignsData: Campaign[] = [
   },
   {
     id: "cause-4",
+    title: "Promoting Men’s Engagement on Unpaid Care & Domestic Work",
+    image: "https://images.unsplash.com/photo-1509099836639-18ba1795216d?q=80&w=800",
+    category: "Education",
+    description: "in Meri Hidase and Abado Primary school funded by the OXFAM in Ethiopia."
+  },
+  {
+    id: "cause-5",
     title: "Addis Forum",
     image: "https://images.unsplash.com/photo-1509099836639-18ba1795216d?q=80&w=800",
     category: "Education",
