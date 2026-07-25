@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { campaignsData, eventsData, blogPostsData, volunteerFaqData } from "./data";
-import { Campaign, Event, BlogPost } from "./types";
+import { campaignsData, eventsData, testimonialsData, blogPostsData, volunteerFaqData } from "./data";
+import { Campaign, Event, BlogPost, Project, DetailedBlogPost } from "./types";
 
 // Component imports
 import Navbar from "./components/Navbar";
@@ -31,9 +31,9 @@ import BlogDetailsPage from "./components/BlogDetailsPage";
 import ContactPage from "./components/ContactPage";
 import AdminPanel from "./components/AdminPanel";
 import PolicyDetailsPage from "./components/PolicyDetailsPage";
+import ResourcesPage from "./components/ResourcesPage";
+import DonationPage from "./components/DonationPage";
 import { policiesData, PolicyItem } from "./data/policiesData";
-import { Project, initialProjects } from "./data/projectsData";
-import { DetailedBlogPost, initialBlogs } from "./data/blogData";
 import { ToastContainer, ToastMessage, ToastType } from "./components/Toast";
 import { useMemo } from "react";
 
@@ -41,13 +41,28 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [checkoutCampaign, setCheckoutCampaign] = useState<Campaign | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [currentView, setCurrentViewInternal] = useState<"home" | "about" | "projects" | "project-details" | "blog" | "blog-details" | "contact" | "admin" | "policy-details">(() => {
+
+  // States for prefilling the dedicated DonationPage
+  const [selectedDonationCampaign, setSelectedDonationCampaign] = useState<{ id?: string; name?: string } | undefined>(undefined);
+  const [donationAmountPreset, setDonationAmountPreset] = useState<number | undefined>(undefined);
+
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedBlog, setSelectedBlog] = useState<DetailedBlogPost | null>(null);
+  const [selectedBlogCategory, setSelectedBlogCategory] = useState<string>("All");
+
+  // Dynamic projects and blogs states backed by SQLite3
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [blogs, setBlogs] = useState<DetailedBlogPost[]>([]);
+
+  const [currentView, setCurrentViewInternal] = useState<"home" | "about" | "projects" | "project-details" | "blog" | "blog-details" | "contact" | "admin" | "policy-details" | "resources" | "donate">(() => {
     const path = window.location.pathname;
     if (path === "/about") return "about";
     if (path === "/projects") return "projects";
     if (path === "/blog") return "blog";
     if (path === "/contact") return "contact";
     if (path === "/admin") return "admin";
+    if (path === "/resources") return "resources";
+    if (path === "/donate") return "donate";
     if (path === "/project-details") return "project-details";
     if (path === "/blog-details") return "blog-details";
     if (path === "/policy-details") return "policy-details";
@@ -68,20 +83,34 @@ export default function App() {
   });
 
   const setCurrentView = useCallback((
-    view: "home" | "about" | "projects" | "project-details" | "blog" | "blog-details" | "contact" | "admin" | "policy-details",
-    policyId?: string
+    view: "home" | "about" | "projects" | "project-details" | "blog" | "blog-details" | "contact" | "admin" | "policy-details" | "resources" | "donate",
+    entityId?: string
   ) => {
     setCurrentViewInternal(view);
+    if (view === "blog") {
+      setSelectedBlogCategory(entityId || "All");
+    }
+    if (view === "policy-details") {
+      const polId = entityId || "policy-2";
+      const found = policiesData.find((p) => p.id === polId);
+      if (found) setSelectedPolicy(found);
+    }
     let path = "/";
     if (view === "about") path = "/about";
     else if (view === "projects") path = "/projects";
-    else if (view === "project-details") path = "/project-details";
+    else if (view === "project-details") {
+      path = entityId ? `/project-details?id=${entityId}` : "/project-details";
+    }
     else if (view === "blog") path = "/blog";
-    else if (view === "blog-details") path = "/blog-details";
+    else if (view === "blog-details") {
+      path = entityId ? `/blog-details?id=${entityId}` : "/blog-details";
+    }
     else if (view === "contact") path = "/contact";
     else if (view === "admin") path = "/admin";
+    else if (view === "resources") path = "/resources";
+    else if (view === "donate") path = "/donate";
     else if (view === "policy-details") {
-      path = `/policy-details?id=${policyId || "policy-2"}`;
+      path = `/policy-details?id=${entityId || "policy-2"}`;
     }
 
     if (window.location.pathname !== path) {
@@ -89,20 +118,55 @@ export default function App() {
     }
   }, []);
 
+  // Synchronize selection with URL when database projects/blogs are loaded or when route changes
+  useEffect(() => {
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+
+    if (path === "/project-details" && id && projects.length > 0) {
+      const found = projects.find((p) => p.id === id);
+      if (found) {
+        setSelectedProject(found);
+      }
+    }
+    if (path === "/blog-details" && id && blogs.length > 0) {
+      const found = blogs.find((b) => b.id === id);
+      if (found) {
+        setSelectedBlog(found);
+      }
+    }
+  }, [projects, blogs, currentView]);
+
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+
       if (path === "/about") setCurrentViewInternal("about");
       else if (path === "/projects") setCurrentViewInternal("projects");
-      else if (path === "/project-details") setCurrentViewInternal("project-details");
+      else if (path === "/project-details") {
+        setCurrentViewInternal("project-details");
+        if (id && projects.length > 0) {
+          const found = projects.find((p) => p.id === id);
+          if (found) setSelectedProject(found);
+        }
+      }
       else if (path === "/blog") setCurrentViewInternal("blog");
-      else if (path === "/blog-details") setCurrentViewInternal("blog-details");
+      else if (path === "/blog-details") {
+        setCurrentViewInternal("blog-details");
+        if (id && blogs.length > 0) {
+          const found = blogs.find((b) => b.id === id);
+          if (found) setSelectedBlog(found);
+        }
+      }
       else if (path === "/contact") setCurrentViewInternal("contact");
       else if (path === "/admin") setCurrentViewInternal("admin");
+      else if (path === "/resources") setCurrentViewInternal("resources");
+      else if (path === "/donate") setCurrentViewInternal("donate");
       else if (path === "/policy-details") {
         setCurrentViewInternal("policy-details");
-        const params = new URLSearchParams(window.location.search);
-        const id = params.get("id");
         if (id) {
           const found = policiesData.find((p) => p.id === id);
           if (found) setSelectedPolicy(found);
@@ -114,35 +178,78 @@ export default function App() {
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
+  }, [projects, blogs]);
+
+  // Sync state with SQLite3 database on mount
+  useEffect(() => {
+    let active = true;
+    async function loadDbData() {
+      try {
+        const [projRes, blogRes] = await Promise.all([
+          fetch("/api/projects"),
+          fetch("/api/blogs")
+        ]);
+        if (projRes.ok && blogRes.ok) {
+          const projs = await projRes.json();
+          const blgs = await blogRes.json();
+          if (active) {
+            setProjects(projs);
+            setBlogs(blgs);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading sqlite data:", err);
+      }
+    }
+    loadDbData();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [selectedBlog, setSelectedBlog] = useState<DetailedBlogPost | null>(null);
+  const handleUpdateProjects = useCallback(async (updated: Project[]) => {
+    setProjects((prevProjects) => {
+      // Find deleted projects
+      const deleted = prevProjects.filter(p => !updated.some(u => u.id === p.id));
+      for (const p of deleted) {
+        fetch(`/api/projects/${p.id}`, { method: "DELETE" }).catch(err => console.error("Failed to delete project:", err));
+      }
 
-  // Dynamic projects and blogs states backed by localStorage
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem("charitics_projects");
-    return saved ? JSON.parse(saved) : initialProjects;
-  });
-
-  const [blogs, setBlogs] = useState<DetailedBlogPost[]>(() => {
-    const saved = localStorage.getItem("charitics_blogs");
-    return saved ? JSON.parse(saved) : initialBlogs;
-  });
-
-  const handleUpdateProjects = useCallback((updated: Project[]) => {
-    setProjects(updated);
-    localStorage.setItem("charitics_projects", JSON.stringify(updated));
+      // Sync creations and updates
+      for (const p of updated) {
+        fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(p)
+        }).catch(err => console.error("Failed to upsert project:", err));
+      }
+      return updated;
+    });
   }, []);
 
-  const handleUpdateBlogs = useCallback((updated: DetailedBlogPost[]) => {
-    setBlogs(updated);
-    localStorage.setItem("charitics_blogs", JSON.stringify(updated));
+  const handleUpdateBlogs = useCallback(async (updated: DetailedBlogPost[]) => {
+    setBlogs((prevBlogs) => {
+      // Find deleted blogs
+      const deleted = prevBlogs.filter(b => !updated.some(u => u.id === b.id));
+      for (const b of deleted) {
+        fetch(`/api/blogs/${b.id}`, { method: "DELETE" }).catch(err => console.error("Failed to delete blog:", err));
+      }
+
+      // Sync creations and updates
+      for (const b of updated) {
+        fetch("/api/blogs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(b)
+        }).catch(err => console.error("Failed to upsert blog:", err));
+      }
+      return updated;
+    });
   }, []);
 
   // Map dynamic state arrays to formats expected by static-typed home components
   const homeCampaigns: Campaign[] = useMemo(() => {
-    return initialProjects.map((p) => ({
+    return projects.map((p) => ({
       id: p.id,
       title: p.title,
       image: p.image,
@@ -151,7 +258,7 @@ export default function App() {
       goal: p.targetAmount,
       description: p.description
     }));
-  }, []);
+  }, [projects]);
 
   const homeBlogPosts: BlogPost[] = useMemo(() => {
     return blogs.map((b) => ({
@@ -208,10 +315,19 @@ export default function App() {
 
   // Event handlers
   const handleQuickDonateSubmit = useCallback((amount: number, isKidSupport: boolean) => {
+    // Map to a suitable prefilled campaign
+    if (isKidSupport) {
+      setSelectedDonationCampaign({ id: "project-1", name: "Family Survival & Burden Relief" });
+    } else {
+      setSelectedDonationCampaign({ id: "general", name: "General Peace & Development Fund" });
+    }
+    setDonationAmountPreset(amount);
+    setCurrentView("donate");
+    window.scrollTo({ top: 0, behavior: "smooth" });
     addToast(
-      "success",
-      "Donation Received",
-      `Thank you so much! You donated $${amount.toLocaleString()} successfully. Your support immediately funds active nutrition and healthcare programs.`
+      "info",
+      "Donation Page Loaded",
+      `We've initialized your secure donation form with $${amount.toLocaleString()}. Please complete your secure protocol details below.`
     );
   }, [addToast]);
 
@@ -241,20 +357,24 @@ export default function App() {
 
   const handleBlogPostRead = useCallback((post: BlogPost) => {
     const detailedBlog = blogs.find(b => b.id === post.id) || blogs[0];
-    setSelectedBlog(detailedBlog);
-    setCurrentView("blog-details");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    addToast(
-      "info",
-      "Journal Loaded",
-      `Displaying "${detailedBlog.title}". Full editorial document and photorealistic community logs are available in our public database.`
-    );
-  }, [blogs, addToast]);
+    if (detailedBlog) {
+      setSelectedBlog(detailedBlog);
+      setCurrentView("blog-details", detailedBlog.id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      addToast(
+        "info",
+        "Journal Loaded",
+        `Displaying "${detailedBlog.title}". Full editorial document and photorealistic community logs are available in our public database.`
+      );
+    }
+  }, [blogs, addToast, setCurrentView]);
 
-  // Open Checkout Modal for a specific campaign card
+  // Open dedicated donation page for a specific campaign card
   const handleOpenCheckout = useCallback((campaign: Campaign) => {
-    setCheckoutCampaign(campaign);
-    setIsCheckoutOpen(true);
+    setSelectedDonationCampaign({ id: campaign.id, name: campaign.title });
+    setDonationAmountPreset(undefined);
+    setCurrentView("donate");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   const handleCheckoutSuccess = useCallback((amount: number, campaignTitle: string) => {
@@ -263,7 +383,25 @@ export default function App() {
       "Payment Successful",
       `Thank you! Sponsoring $${amount.toLocaleString()} for "${campaignTitle}" was processed successfully. Together we protect lives.`
     );
-  }, [addToast]);
+    if (checkoutCampaign) {
+      setProjects((prevProjects) => {
+        const updated = prevProjects.map((p) => {
+          if (p.id === checkoutCampaign.id) {
+            const updatedProject = { ...p, raisedAmount: p.raisedAmount + amount };
+            // Sync to SQLite
+            fetch("/api/projects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(updatedProject)
+            }).catch(err => console.error("Failed to sync checkout donation:", err));
+            return updatedProject;
+          }
+          return p;
+        });
+        return updated;
+      });
+    }
+  }, [checkoutCampaign, addToast]);
 
   const handleNavbarJoinClick = useCallback(() => {
     if (currentView !== "home") {
@@ -325,15 +463,13 @@ export default function App() {
       />
 
       {/* Primary Sticky Header Navigation */}
-      {currentView !== "policy-details" && (
+      {currentView !== "admin" && (
         <Navbar
           onDonateClick={() => {
-            if (currentView !== "home") {
-              setCurrentView("home");
-              setTimeout(() => handleScrollToSection("donation"), 100);
-            } else {
-              handleScrollToSection("donation");
-            }
+            setSelectedDonationCampaign(undefined);
+            setDonationAmountPreset(undefined);
+            setCurrentView("donate");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           }}
           onNavigate={handleScrollToSection}
           onJoinClick={handleNavbarJoinClick}
@@ -356,7 +492,9 @@ export default function App() {
               {/* Section 1: Hero section */}
               <Hero
                 onDonateClick={() => {
-                  setCurrentView("about");
+                  setSelectedDonationCampaign(undefined);
+                  setDonationAmountPreset(undefined);
+                  setCurrentView("donate");
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 onExploreClick={() => {
@@ -411,6 +549,10 @@ export default function App() {
                   setCurrentView("policy-details", policy.id);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
+                onViewAllResources={() => {
+                  setCurrentView("resources");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
               />
 
               {/* Section 10: Dedicated Partner Brands section */}
@@ -418,7 +560,12 @@ export default function App() {
 
               {/* Section 11: Call to Action */}
               <CTA 
-                onDonateClick={() => handleScrollToSection("donation")}
+                onDonateClick={() => {
+                  setSelectedDonationCampaign(undefined);
+                  setDonationAmountPreset(undefined);
+                  setCurrentView("donate");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
                 onPartnerClick={() => handleScrollToSection("contact")}
               />
             </motion.div>
@@ -434,11 +581,36 @@ export default function App() {
             >
               <AboutPage
                 onDonateClick={() => {
-                  setCurrentView("home");
-                  setTimeout(() => handleScrollToSection("donation"), 100);
+                  setSelectedDonationCampaign(undefined);
+                  setDonationAmountPreset(undefined);
+                  setCurrentView("donate");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 onJoinClick={handleNavbarJoinClick}
                 onBackToHome={() => setCurrentView("home")}
+                campaigns={homeCampaigns}
+                onDonateCampaignClick={(campaign) => {
+                  if (campaign) {
+                    setSelectedDonationCampaign({ id: campaign.id, name: campaign.title });
+                  }
+                  setDonationAmountPreset(undefined);
+                  setCurrentView("donate");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onViewAllProjects={() => {
+                  setCurrentView("projects");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onPolicySelect={(policy) => {
+                  setSelectedPolicy(policy);
+                  setCurrentView("policy-details", policy.id);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onViewAllResources={() => {
+                  setCurrentView("resources");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onQuickDonateSubmit={handleQuickDonateSubmit}
               />
             </motion.div>
           )}
@@ -452,23 +624,29 @@ export default function App() {
               transition={{ duration: 0.3 }}
             >
               <ProjectsPage
-                projects={initialProjects}
-                onDonateClick={() => {
-                  setCurrentView("home");
-                  setTimeout(() => handleScrollToSection("donation"), 100);
+                projects={projects}
+                onDonateClick={(proj) => {
+                  if (proj) {
+                    setSelectedDonationCampaign({ id: proj.id, name: proj.title });
+                  } else {
+                    setSelectedDonationCampaign(undefined);
+                  }
+                  setDonationAmountPreset(undefined);
+                  setCurrentView("donate");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 onJoinClick={handleNavbarJoinClick}
                 onBackToHome={() => setCurrentView("home")}
                 onProjectSelect={(proj) => {
                   setSelectedProject(proj);
-                  setCurrentView("project-details");
+                  setCurrentView("project-details", proj.id);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               />
             </motion.div>
           )}
-
-          {currentView === "project-details" && selectedProject && (
+ 
+          {currentView === "project-details" && (
             <motion.div
               key="project-details-view"
               initial={{ opacity: 0, y: 10 }}
@@ -476,26 +654,41 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              <ProjectDetailsPage
-                project={initialProjects.find((p) => p.id === selectedProject.id) || selectedProject}
-                projects={initialProjects}
-                onNavigateToProject={(proj) => {
-                  setSelectedProject(proj);
-                  window.scrollTo({ top: 0 });
-                }}
-                onDonateClick={() => {
-                  setCurrentView("home");
-                  setTimeout(() => handleScrollToSection("donation"), 100);
-                }}
-                onBackToHome={() => setCurrentView("home")}
-                onBackToProjects={() => {
-                  setCurrentView("projects");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-              />
+              {!selectedProject ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] bg-gray-50 gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5CB815]"></div>
+                  <p className="text-gray-500 font-medium text-sm">Loading Project Details...</p>
+                </div>
+              ) : (
+                <ProjectDetailsPage
+                  project={projects.find((p) => p.id === selectedProject.id) || selectedProject}
+                  projects={projects}
+                  onNavigateToProject={(proj) => {
+                    setSelectedProject(proj);
+                    setCurrentView("project-details", proj.id);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  onDonateClick={(proj) => {
+                    if (proj) {
+                      setSelectedDonationCampaign({ id: proj.id, name: proj.title });
+                    } else if (selectedProject) {
+                      setSelectedDonationCampaign({ id: selectedProject.id, name: selectedProject.title });
+                    }
+                    setDonationAmountPreset(undefined);
+                    setCurrentView("donate");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onBackToHome={() => setCurrentView("home")}
+                  onBackToProjects={() => {
+                    setCurrentView("projects");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onUpdateProjects={handleUpdateProjects}
+                />
+              )}
             </motion.div>
           )}
-
+ 
           {currentView === "blog" && (
             <motion.div
               key="blog-view"
@@ -506,9 +699,11 @@ export default function App() {
             >
               <BlogPage
                 blogs={blogs}
+                selectedCategory={selectedBlogCategory}
+                onCategoryChange={setSelectedBlogCategory}
                 onBlogSelect={(blogItem) => {
                   setSelectedBlog(blogItem);
-                  setCurrentView("blog-details");
+                  setCurrentView("blog-details", blogItem.id);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 onBackToHome={() => {
@@ -518,8 +713,8 @@ export default function App() {
               />
             </motion.div>
           )}
-
-          {currentView === "blog-details" && selectedBlog && (
+ 
+          {currentView === "blog-details" && (
             <motion.div
               key="blog-details-view"
               initial={{ opacity: 0, y: 10 }}
@@ -527,22 +722,32 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              <BlogDetailsPage
-                blog={selectedBlog}
-                onNavigateToBlog={(blogItem) => {
-                  setSelectedBlog(blogItem);
-                  window.scrollTo({ top: 0 });
-                }}
-                onBackToBlogs={() => {
-                  setCurrentView("blog");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                onBackToHome={() => {
-                  setCurrentView("home");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                addToast={addToast}
-              />
+              {!selectedBlog ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] bg-gray-50 gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5CB815]"></div>
+                  <p className="text-gray-500 font-medium text-sm">Loading Journal Details...</p>
+                </div>
+              ) : (
+                <BlogDetailsPage
+                  blog={selectedBlog}
+                  blogs={blogs}
+                  onNavigateToBlog={(blogItem) => {
+                    setSelectedBlog(blogItem);
+                    setCurrentView("blog-details", blogItem.id);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  onBackToBlogs={() => {
+                    setCurrentView("blog");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onBackToHome={() => {
+                    setCurrentView("home");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  addToast={addToast}
+                  onUpdateBlogs={handleUpdateBlogs}
+                />
+              )}
             </motion.div>
           )}
 
@@ -564,6 +769,29 @@ export default function App() {
             </motion.div>
           )}
 
+          {currentView === "resources" && (
+            <motion.div
+              key="resources-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ResourcesPage
+                onPolicySelect={(policy) => {
+                  setSelectedPolicy(policy);
+                  setCurrentView("policy-details", policy.id);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onBackToHome={() => {
+                  setCurrentView("home");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                addToast={addToast}
+              />
+            </motion.div>
+          )}
+
           {currentView === "policy-details" && selectedPolicy && (
             <motion.div
               key="policy-details-view"
@@ -575,10 +803,42 @@ export default function App() {
               <PolicyDetailsPage
                 policy={selectedPolicy}
                 onBack={() => {
-                  setCurrentView("home");
-                  setTimeout(() => handleScrollToSection("policies-documents"), 400);
+                  setCurrentView("resources");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 addToast={addToast}
+              />
+            </motion.div>
+          )}
+
+          {currentView === "donate" && (
+            <motion.div
+              key="donate-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <DonationPage
+                onBackToHome={() => {
+                  setCurrentView("home");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                addToast={addToast}
+                selectedCampaignName={selectedDonationCampaign?.name}
+                selectedCampaignId={selectedDonationCampaign?.id}
+                initialAmount={donationAmountPreset}
+                onDonationSuccess={async () => {
+                  try {
+                    const res = await fetch("/api/projects");
+                    if (res.ok) {
+                      const projs = await res.json();
+                      setProjects(projs);
+                    }
+                  } catch (e) {
+                    console.error("Failed to refresh projects after donation:", e);
+                  }
+                }}
               />
             </motion.div>
           )}
@@ -608,10 +868,12 @@ export default function App() {
       </main>
 
       {/* Global double-row footer */}
-      <Footer
-        onNewsletterSubmit={handleNewsletterSubscribe}
-        onNavigate={handleFooterNavigation}
-      />
+      {currentView !== "admin" && (
+        <Footer
+          onNewsletterSubmit={handleNewsletterSubscribe}
+          onNavigate={handleFooterNavigation}
+        />
+      )}
 
       {/* Scroll to Top Floating Button */}
       <BackToTop />

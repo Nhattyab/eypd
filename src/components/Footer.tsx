@@ -75,7 +75,7 @@ export default function Footer({ onNewsletterSubmit, onNavigate }: FooterProps) 
       </div>
 
       {/* 2. Structured Footer Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 pt-4 relative z-10" id="footer-top-row">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 pt-4 relative z-10" id="footer-top-row">
         <div className="grid grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8">
           
           {/* Col 1: Brand Info */}
@@ -85,7 +85,7 @@ export default function Footer({ onNewsletterSubmit, onNavigate }: FooterProps) 
               onClick={() => onNavigate("home")}
               id="header-logo"
             >
-              <div className="w-40 h-15 overflow-hidden border border-gray-100 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300 shrink-0">
+              <div className="w-40 h-15 overflow-hidden  flex items-center justify-center group-hover:scale-105 transition-transform duration-300 shrink-0">
                 <img
                   src={logoImg}
                   alt="Eypd Logo"
@@ -101,16 +101,16 @@ export default function Footer({ onNewsletterSubmit, onNavigate }: FooterProps) 
 
             {/* Social Links inside rounded dark boxes */}
             <div className="flex items-center gap-3.5" id="footer-social-links">
-              <a href="#" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
+              <a href="https://www.facebook.com/profile.php?id=61551751547218&mibextid=wwXIfr&rdid=uvaFUC4jCzMhzLTP&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1GmD1C5Qr6%2F%3Fmibextid%3DwwXIfr%26ref%3D1#" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
                 <Facebook className="w-4 h-4" />
               </a>
-              <a href="#" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
+              <a href="https://t.me/EYDPA" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
                 <Twitter className="w-4 h-4" />
               </a>
-              <a href="#" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
+              <a href="https://www.linkedin.com/company/ethiopian-youth-for-peace-and-development/" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
                 <Linkedin className="w-4 h-4" />
               </a>
-              <a href="#" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
+              <a href="https://www.tiktok.com/@eypd2026?_r=1&_t=ZS-97fXG7wbm0l" className="w-10 h-10 bg-white/[0.03] border border-white/5 hover:border-[#478b1b] text-gray-400 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300">
                 <Youtube className="w-4 h-4" />
               </a>
             </div>
@@ -126,7 +126,7 @@ export default function Footer({ onNewsletterSubmit, onNavigate }: FooterProps) 
                 { label: "About Us", target: "about" },
                 { label: "Our Services", target: "services" },
                 { label: "Our Blogs", target: "news" },
-                { label: "FAQ'S", target: "faq" },
+                { label: "Policies", target: "resources" },
                 { label: "Contact Us", target: "contact" },
               ].map((link) => (
                 <li key={link.label}>
@@ -210,7 +210,11 @@ export default function Footer({ onNewsletterSubmit, onNavigate }: FooterProps) 
       <div className="bg-[#181f2a] py-6 text-xs sm:text-sm text-white font-display font-bold border-t border-gray-300" id="footer-bottom-row">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-            <p>© 2025 EYPD — All rights reserved.</p>
+            <p>© 2026 EYPD — All rights reserved.</p>
+
+            <div className="flex items-center gap-6" id="footer-policy-links">
+              Made By :<a href="#" className="hover:underline transition-all text-sm"> Wari Communications</a>
+            </div>
 
             <div className="flex items-center gap-6" id="footer-policy-links">
               <a href="#" className="hover:underline transition-all">Terms & Conditions</a>

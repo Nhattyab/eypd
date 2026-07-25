@@ -1,115 +1,129 @@
-import { useState, FormEvent } from "react";
+import React, { useState } from "react";
+import { DetailedBlogPost, BlogComment } from "../types";
+import { ArrowLeft, Calendar, User, MessageSquare, Send, Quote, Heart, Tag, Facebook, Twitter, Linkedin, Instagram } from "lucide-react";
 import { motion } from "motion/react";
-import { 
-  User, 
-  Tag,
-  MapPin, 
-  Search, 
-  Calendar, 
-  Facebook, 
-  Twitter, 
-  Linkedin, 
-  Instagram, 
-  CornerDownRight, 
-  MessageSquare, 
-  Send 
-} from "lucide-react";
-import { 
-  DetailedBlogPost, 
-  categoriesWithCounts, 
-  tagCloudList, 
-  initialBlogs, 
-} from "../data/blogData";
-
-// @ts-ignore
-import imgChildren from "../assets/images/quality_education_1782473853014.jpg";
-// @ts-ignore
-import imgPortrait from "../assets/images/refugee_child_portrait_1782472576507.jpg";
 
 interface BlogDetailsPageProps {
   blog: DetailedBlogPost;
-  onNavigateToBlog: (blog: DetailedBlogPost) => void;
+  blogs?: DetailedBlogPost[];
+  onNavigateToBlog?: (blog: DetailedBlogPost) => void;
   onBackToBlogs: () => void;
-  onBackToHome: () => void;
-  addToast: (type: "success" | "info" | "warning" | "error", title: string, message: string) => void;
+  onBackToHome?: () => void;
+  addToast?: (type: "success" | "error" | "info" | "warning", title: string, message: string) => void;
+  onUpdateBlogs?: (updatedBlogs: DetailedBlogPost[]) => void; // refresh in parent state
 }
 
 export default function BlogDetailsPage({
   blog,
+  blogs = [],
   onNavigateToBlog,
   onBackToBlogs,
   onBackToHome,
-  addToast
+  addToast,
+  onUpdateBlogs
 }: BlogDetailsPageProps) {
-  const [sidebarSearch, setSidebarSearch] = useState("");
-  
-  // Form States
   const [commentName, setCommentName] = useState("");
-  const [commentEmail, setCommentEmail] = useState("");
-  const [commentSubject, setCommentSubject] = useState("");
-  const [commentMessage, setCommentMessage] = useState("");
+  const [commentContent, setCommentContent] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
-  const handleSearchSubmit = (e: FormEvent) => {
+  const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sidebarSearch.trim()) return;
-    
-    // Find a blog post matching search
-    const found = initialBlogs.find(b => 
-      b.title.toLowerCase().includes(sidebarSearch.toLowerCase()) 
-    );
+    if (!commentName.trim() || !commentContent.trim()) return;
 
-    if (found) {
-      onNavigateToBlog(found);
-      addToast("success", "Blog Found", `Loaded: "${found.title}"`);
-      setSidebarSearch("");
-    } else {
-      addToast("info", "No Results", `Could not find any blogs matching "${sidebarSearch}"`);
+    setIsSubmittingComment(true);
+    try {
+      const newComment: BlogComment = {
+        id: `bc-${Date.now()}`,
+        name: commentName.trim(),
+        avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(commentName.trim())}`,
+        date: new Date().toLocaleDateString("en-US", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        content: commentContent.trim(),
+      };
+
+      const res = await fetch(`/api/blogs/${blog.id}/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: newComment }),
+      });
+
+      if (res.ok) {
+        // Successfully added comment to server. Update state.
+        const updatedBlog = {
+          ...blog,
+          comments: [...blog.comments, newComment],
+        };
+        // Fetch latest blogs to refresh state
+        const refreshRes = await fetch("/api/blogs");
+        if (refreshRes.ok && onUpdateBlogs) {
+          const freshList = await refreshRes.json();
+          onUpdateBlogs(freshList);
+        }
+        setCommentName("");
+        setCommentContent("");
+      }
+    } catch (err) {
+      console.error("Failed to post comment:", err);
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
-  const handleCategoryClick = (catName: string) => {
-    // Navigate or filter blogs
-    addToast("info", `Category Selected`, `Viewing posts in "${catName}" category.`);
-  };
-
-  const handleTagClick = (tag: string) => {
-    addToast("info", `Tag Selected`, `Filtering articles with tag: #${tag}`);
-  };
-
-  const handleCommentSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!commentName.trim() || !commentEmail.trim() || !commentMessage.trim()) {
-      addToast("warning", "Missing Fields", "Please fill in all required fields to post a comment.");
-      return;
-    }
-
-  
+  // Calculate category counts dynamically
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    blogs.forEach((b) => {
+      counts[b.category] = (counts[b.category] || 0) + 1;
+    });
     
-    // Reset Form
-    setCommentName("");
-    setCommentEmail("");
-    setCommentSubject("");
-    setCommentMessage("");
-  };
+    const displayList = [
+      { name: "Charity", count: counts["Charity"] || 8 },
+      { name: "Crowdfunding", count: counts["Crowdfunding"] || 11 },
+      { name: "Industries", count: counts["Industries"] || 18 },
+      { name: "Innovations", count: counts["Innovations"] || 11 },
+      { name: "Technology", count: counts["Technology"] || 7 }
+    ];
 
-  // Get 3 recent posts (excluding current if possible)
-  const recentPosts = initialBlogs
-    .filter(b => b.id !== blog.id)
-    .slice(0, 3);
+    return displayList.map(cat => ({
+      name: cat.name,
+      count: cat.count < 10 ? `0${cat.count}` : `${cat.count}`
+    }));
+  }, [blogs]);
+
+  const recentBlogs = React.useMemo(() => {
+    const filtered = blogs.filter(b => b.id !== blog.id);
+    return filtered.length > 0 ? filtered.slice(0, 3) : blogs.slice(0, 3);
+  }, [blogs, blog]);
+
+  const formatRecentDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const day = d.getDate();
+        const month = d.toLocaleString("en-US", { month: "short" });
+        return `${day}, ${month}`;
+      }
+    } catch (e) {}
+    return dateStr;
+  };
 
   return (
-    <div className="bg-transparent min-h-screen text-gray-800" id="blog-details-container">
-      
-      {/* 1. Page Header with Breadcrumbs */}
+    <div className="bg-gray-50 min-h-screen pb-24">
       <section
         className="relative bg-secondary py-42 text-white flex flex-col items-center justify-center text-center overflow-hidden"
-        id="blog-details-hero-banner"
+        id="project-details-hero"
       >
+        {/* Banner background photo with dark overlay */}
         <div className="absolute inset-0 z-0">
           <img
             src={blog.image}
-            alt="Blog Details Background"
-            className="w-full h-full object-cover opacity-25 filter grayscale"
+            alt="Project Details Banner Background"
+            className="w-full h-full object-cover opacity-20 filter grayscale"
             referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#111e38] via-[#10352c] to-[#0e4d2d] z-10" />
@@ -134,168 +148,260 @@ export default function BlogDetailsPage({
               Blogs
             </button>
             <span className="text-primary font-black">»</span>
-            <span className="text-white truncate max-w-[180px] sm:max-w-xs">Blog Details</span>
+            <span className="text-white">Blog Details</span>
           </div>
         </div>
       </section>
 
-      {/* 2. Main Two-Column Content Layout (Sidebar LEFT, Content RIGHT) */}
-      <section className="py-14 bg-white" id="blog-details-content-section">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
+        {/* Back navigation */}
+        <button
+          onClick={onBackToBlogs}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-emerald-700 transition-colors mb-8 group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Back to Journals
+        </button>
+
+        {/* 2-Column Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* LEFT COLUMN: Sidebar (order-2 on mobile, order-1 on desktop) */}
+          <div className="lg:col-span-4 order-2 lg:order-1 space-y-8 lg:sticky lg:top-28 lg:self-start">
             
-            {/* ================= LEFT SIDEBAR ================= */}
-            <aside className="lg:col-span-4 space-y-10" id="blog-details-sidebar">
-         
-              {/* Widget 2: Categories */}
-              <div className="bg-[#f8f9fa] rounded-3xl p-6 sm:p-8 border border-gray-100/60 shadow-sm space-y-5">
-                <h4 className="font-display font-black text-xl text-secondary pb-3 relative after:absolute after:bottom-0 after:left-0 after:w-12 after:h-[3px] after:bg-primary">
-                  Categories
-                </h4>
-                <div className="space-y-3">
-                  {categoriesWithCounts.map((cat) => (
-                    <button
-                      key={cat.name}
-                      onClick={() => handleCategoryClick(cat.name)}
-                      className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-white border border-gray-100 text-left hover:border-[#ff5e14] text-secondary font-display font-bold text-sm transition-all duration-200 group hover:shadow-sm"
-                    >
-                      <span className="group-hover:text-[#ff5e14] transition-colors">{cat.name}</span>
-                      <span className="text-xs bg-gray-100 text-gray-500 py-0.5 px-2.5 rounded-full group-hover:bg-[#ff5e14]/10 group-hover:text-[#ff5e14] transition-all">
-                        ({cat.count})
-                      </span>
-                    </button>
-                  ))}
-                </div>
+            {/* Categories Widget */}
+            <div className="bg-white rounded-[2rem] p-6 sm:p-8 border border-gray-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+              <div className="relative mb-6">
+                <h3 className="text-lg sm:text-xl font-black text-[#0B301D] tracking-tight">Categories</h3>
+                <div className="w-10 h-[3px] bg-[#5CB815] mt-2 rounded-full" />
               </div>
-
-              {/* Widget 3: Recent Posts */}
-              <div className="bg-[#f8f9fa] rounded-3xl p-6 sm:p-8 border border-gray-100/60 shadow-sm space-y-5">
-                <h4 className="font-display font-black text-xl text-secondary pb-3 relative after:absolute after:bottom-0 after:left-0 after:w-12 after:h-[3px] after:bg-primary">
-                  Recent Posts
-                </h4>
-                <div className="space-y-5">
-                  {recentPosts.map((post) => (
-                    <div 
-                      key={post.id} 
-                      onClick={() => {
-                        onNavigateToBlog(post);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="flex gap-4 group cursor-pointer"
-                    >
-                      <div className="w-20 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100 border border-gray-200 shadow-sm">
-                        <img
-                          src={post.image}
-                          alt={post.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-display font-bold">
-                          <Calendar className="w-3.5 h-3.5 text-primary" />
-                          <span>{post.date}</span>
-                        </div>
-                        <h5 className="font-display font-extrabold text-xs sm:text-sm text-secondary group-hover:text-[#ff5e14] transition-colors leading-snug line-clamp-2">
-                          {post.title}
-                        </h5>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </aside>
-
-            {/* ================= RIGHT MAIN CONTENT ================= */}
-            <main className="lg:col-span-8 space-y-10" id="blog-details-main-body">
-              
-              {/* Blog Article Core */}
-              <article className="space-y-6" id="blog-article-body">
-                {/* Major Image Block */}
-                <div className="w-full aspect-[16/9] rounded-3xl overflow-hidden bg-gray-100 border border-gray-100 shadow-md">
-                  <img
-                    src={blog.image}
-                    alt={blog.title}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-
-                {/* Meta details */}
-                <div className="flex items-center gap-6 text-xs sm:text-sm text-gray-500 font-display font-bold pt-2">
-                  <span className="flex items-center gap-2">
-                    <User className="w-4.5 h-4.5 text-primary" />
-                    <span>By {blog.author}</span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <MapPin className="w-4.5 h-4.5 text-primary" />
-                    <span>{blog.location}</span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Tag className="w-4.5 h-4.5 text-primary" />
-                    <span>{blog.category}</span>
-                  </span>
-                </div>
-
-                {/* Main Heading */}
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-black text-secondary leading-tight">
-                  {blog.title}
-                </h2>
-
-                {/* Paragraphs */}
-                <div className="space-y-4 text-sm sm:text-base text-gray-600 leading-relaxed font-sans">
-                  {blog.content.map((para, i) => (
-                    <p key={i}>{para}</p>
-                  ))}
-                </div>
-
-                {/* Quote */}
-                <div className="border-l-4 border-[#2c6e49] pl-4 py-1.5 bg-[#fcfdfd] italic text-base sm:text-lg text-[#2c6e49] font-sans font-semibold rounded-r-lg">
-                    <p>{blog.quote}</p>
-                </div>
-
-                <p className="text-sm sm:text-base text-gray-600 leading-relaxed font-sans">
-                  {blog.lastparagraph}
-                </p>
-
-                {/* Tags and Share footer row */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6 border-y border-gray-200 gap-4 mt-12 text-sm">
-                  {/* Tags */}
-                  <div className="flex flex-wrap items-center gap-2 text-secondary font-display font-black">
-                    <span className="uppercase tracking-wider text-xs">Tags:</span>
-                    {blog.tags.map((t, idx) => (
-                      <span key={t} className="text-gray-500 font-sans font-medium text-xs sm:text-sm">
-                        {t}{idx < blog.tags.length - 1 ? "  |  " : ""}
-                      </span>
-                    ))}
+              <div className="space-y-3">
+                {categoryCounts.map((cat) => (
+                  <div
+                    key={cat.name}
+                    className="flex items-center justify-between bg-white hover:bg-emerald-50/20 p-3.5 px-5 rounded-xl border border-gray-100 hover:border-emerald-100/60 shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:shadow-md transition-all text-sm font-extrabold text-[#0B301D] cursor-pointer"
+                  >
+                    <span>{cat.name}</span>
+                    <span className="text-[#5CB815] font-black">({cat.count})</span>
                   </div>
+                ))}
+              </div>
+            </div>
 
-                  {/* Share */}
-                  <div className="flex items-center gap-3 text-secondary font-display font-black">
-                    <span className="uppercase tracking-wider text-xs">Share:</span>
-                    <div className="flex items-center gap-2">
-                      <a href="#" className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#ff5e14] hover:border-[#ff5e14] transition-all">
-                        <Facebook className="w-3.5 h-3.5" />
-                      </a>
-                      <a href="#" className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#ff5e14] hover:border-[#ff5e14] transition-all">
-                        <Twitter className="w-3.5 h-3.5" />
-                      </a>
-                      <a href="#" className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#ff5e14] hover:border-[#ff5e14] transition-all">
-                        <Linkedin className="w-3.5 h-3.5" />
-                      </a>
-                      <a href="#" className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#ff5e14] hover:border-[#ff5e14] transition-all">
-                        <Instagram className="w-3.5 h-3.5" />
-                      </a>
+            {/* Recent Posts Widget */}
+            <div className="bg-white rounded-[2rem] p-6 sm:p-8 border border-gray-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+              <div className="relative mb-6">
+                <h3 className="text-lg sm:text-xl font-black text-[#0B301D] tracking-tight">Recent Posts</h3>
+                <div className="w-10 h-[3px] bg-[#5CB815] mt-2 rounded-full" />
+              </div>
+              <div className="space-y-5">
+                {recentBlogs.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => onNavigateToBlog?.(item)}
+                    className="flex gap-4 items-center group cursor-pointer border-b border-gray-50 pb-4 last:border-0 last:pb-0"
+                  >
+                    <img
+                      src={item.image || "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?q=80&w=120"}
+                      alt={item.title}
+                      className="w-16 h-16 rounded-xl object-cover bg-gray-50 border border-gray-100/80 group-hover:scale-105 transition-transform shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[11px] text-[#5CB815] font-black block mb-1 flex items-center gap-1 uppercase tracking-wider">
+                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        {formatRecentDate(item.date)}
+                      </span>
+                      <h4 className="text-xs sm:text-sm font-bold text-[#0B301D] group-hover:text-emerald-600 transition-colors line-clamp-2 leading-snug">
+                        {item.title}
+                      </h4>
                     </div>
                   </div>
-                </div>
-              </article>
-            </main>
+                ))}
+              </div>
+            </div>
 
           </div>
-        </div>
-      </section>
 
+          {/* RIGHT COLUMN: Main Content (order-1 on mobile, order-2 on desktop) */}
+          <div className="lg:col-span-8 order-1 lg:order-2 space-y-8">
+            
+            {/* Main Article Container */}
+            <div className="bg-white rounded-[2rem] p-6 sm:p-8 md:p-10 border border-gray-100/80 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+              
+              {/* Cover Image */}
+              <div className="rounded-[1.5rem] overflow-hidden aspect-[16/10] bg-gray-100 shadow-sm border border-gray-100 mb-6">
+                <img
+                  src={blog.image || "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?q=80&w=1200"}
+                  alt={blog.title}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              {/* Meta Row */}
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs sm:text-sm font-bold text-gray-500 pb-4 border-b border-gray-100">
+                <span className="flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-[#5CB815]" />
+                  <span>By {blog.author}</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-[#5CB815]" />
+                  <span>{blog.date}</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Tag className="w-4 h-4 text-[#5CB815]" />
+                  <span>{blog.category}</span>
+                </span>
+              </div>
+
+              {/* Title */}
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#0B301D] leading-tight mt-6 mb-4 font-display">
+                {blog.title}
+              </h2>
+
+              {/* Excerpt / Subtitle */}
+              {blog.excerpt && (
+                <p className="text-base sm:text-lg text-gray-600 mb-6 font-medium leading-relaxed italic">
+                  {blog.excerpt}
+                </p>
+              )}
+
+              {/* Main Content Body */}
+              <div className="prose max-w-none text-gray-600 leading-relaxed text-base space-y-6">
+                {blog.content && blog.content.length > 0 ? (
+                  blog.content.map((p, idx) => (
+                    <React.Fragment key={idx}>
+                      <p className="leading-relaxed text-gray-700">{p}</p>
+                      
+                      {/* Place quote beautifully after the first paragraph if there is a quote */}
+                      {idx === 0 && blog.quote && (
+                        <div className="my-8 pl-5 border-l-4 border-[#5CB815] italic text-[#0B301D]/90 font-bold text-base sm:text-lg leading-relaxed">
+                          "{blog.quote}"
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <p className="italic text-gray-400">No article text provided.</p>
+                )}
+              </div>
+
+              {/* Bottom Section: Tags & Share */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 border-t border-gray-100 mt-10">
+                {/* Tags */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-black text-gray-900 uppercase tracking-wider">Tags:</span>
+                  {blog.tags && blog.tags.length > 0 ? (
+                    blog.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-xs font-extrabold text-[#0B301D]/70 hover:text-[#5CB815] transition-colors"
+                      >
+                        #{tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-400 font-bold">#EYPD #Community</span>
+                  )}
+                </div>
+
+                {/* Share Icons */}
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-black text-gray-900 uppercase tracking-wider">Share:</span>
+                  <div className="flex items-center gap-2">
+                    <a href="#" className="w-8 h-8 rounded-full border border-gray-100 hover:border-[#5CB815] flex items-center justify-center text-gray-400 hover:text-[#5CB815] transition-all bg-white shadow-sm hover:scale-105">
+                      <Facebook className="w-3.5 h-3.5" />
+                    </a>
+                    <a href="#" className="w-8 h-8 rounded-full border border-gray-100 hover:border-[#5CB815] flex items-center justify-center text-gray-400 hover:text-[#5CB815] transition-all bg-white shadow-sm hover:scale-105">
+                      <Twitter className="w-3.5 h-3.5" />
+                    </a>
+                    <a href="#" className="w-8 h-8 rounded-full border border-gray-100 hover:border-[#5CB815] flex items-center justify-center text-gray-400 hover:text-[#5CB815] transition-all bg-white shadow-sm hover:scale-105">
+                      <Linkedin className="w-3.5 h-3.5" />
+                    </a>
+                    <a href="#" className="w-8 h-8 rounded-full border border-gray-100 hover:border-[#5CB815] flex items-center justify-center text-gray-400 hover:text-[#5CB815] transition-all bg-white shadow-sm hover:scale-105">
+                      <Instagram className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Comments Board Card */}
+            <div className="bg-white rounded-[2rem] p-6 sm:p-8 md:p-10 border border-gray-100/80 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+              <h3 className="text-2xl font-black text-[#0B301D] mb-6 flex items-center gap-2">
+                <MessageSquare className="w-6 h-6 text-gray-400" />
+                Comments ({blog.comments ? blog.comments.length : 0})
+              </h3>
+
+              {/* Form */}
+              <form onSubmit={handlePostComment} className="mb-8 bg-gray-50/50 p-6 rounded-2xl border border-gray-100/80">
+                <h4 className="text-sm font-black text-gray-800 mb-4 uppercase tracking-wider">Leave a Comment</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Your Name"
+                      value={commentName}
+                      onChange={(e) => setCommentName(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all bg-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <textarea
+                      rows={4}
+                      placeholder="Share your encouraging feedback or supportive comments..."
+                      value={commentContent}
+                      onChange={(e) => setCommentContent(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all bg-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingComment}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#5CB815] hover:bg-[#4ea211] text-white text-xs font-bold rounded-xl shadow-md transition-all disabled:opacity-50"
+                    >
+                      {isSubmittingComment ? "Posting..." : "Post Comment"}
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {/* Comments List */}
+              {!blog.comments || blog.comments.length === 0 ? (
+                <p className="text-gray-400 text-center py-6 italic">No comments yet. Be the first to share your thoughts!</p>
+              ) : (
+                <div className="space-y-6">
+                  {blog.comments.map((comment) => (
+                    <div key={comment.id} className="flex gap-4 border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                      <img
+                        src={comment.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(comment.name)}`}
+                        alt={comment.name}
+                        className="w-11 h-11 rounded-xl bg-gray-100 border border-gray-200 shrink-0"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-extrabold text-gray-900 text-sm">{comment.name}</span>
+                          <span className="text-xs text-gray-400">{comment.date}</span>
+                        </div>
+                        <p className="text-gray-600 text-sm leading-relaxed">{comment.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
     </div>
   );
 }

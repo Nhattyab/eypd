@@ -18,7 +18,7 @@ export default function ContactPage({ onBackToHome, addToast }: ContactPageProps
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!name.trim() || !email.trim() || !message.trim()) {
@@ -28,19 +28,31 @@ export default function ContactPage({ onBackToHome, addToast }: ContactPageProps
 
     setIsSubmitting(true);
 
-    // Simulate sending email
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, subject, message }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit message");
+      }
+
       addToast(
         "success",
         "Message Sent Successfully!",
-        `Thank you ${name}, we have received your message and will get back to you shortly.`
+        `Thank you ${name}, your message has been received and logged in our system.`
       );
       setName("");
       setEmail("");
       setSubject("");
       setMessage("");
+    } catch (err: any) {
+      addToast("error", "Submission Failed", err.message || "An error occurred.");
+    } finally {
       setIsSubmitting(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -72,7 +84,7 @@ export default function ContactPage({ onBackToHome, addToast }: ContactPageProps
             >
               Home
             </button>
-            <span className="text-[#ff5e14] font-black">»</span>
+            <span className="text-primary font-black">»</span>
             <span className="text-white">Contact us</span>
           </div>
         </div>
@@ -143,7 +155,7 @@ export default function ContactPage({ onBackToHome, addToast }: ContactPageProps
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center justify-between gap-5 bg-primary hover:bg-secondary text-white font-display font-bold text-sm rounded-full py-4.5 px-8 transition-all duration-300 cursor-pointer shadow-lg group hover:shadow-[#ff5e14]/15"
+                className="inline-flex items-center justify-between gap-5 bg-[#0a1118] hover:bg-[#ff5e14] text-white font-display font-bold text-sm rounded-full py-4.5 px-8 transition-all duration-300 cursor-pointer shadow-lg group hover:shadow-[#ff5e14]/15"
                 id="form-submit-btn"
               >
                 <span>{isSubmitting ? "Sending..." : "Get in Touch"}</span>

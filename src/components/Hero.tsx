@@ -1,7 +1,24 @@
-import { motion } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Heart, ChevronsRight } from "lucide-react";
 // @ts-ignore
 import refugeeChildImage from "../assets/images/refugee_child_portrait_1782472576507.jpg";
+// @ts-ignore
+import volunteerFoodImage from "../assets/images/volunteer_food_delivery_1782474593369.jpg";
+// @ts-ignore
+import pureWaterImage from "../assets/images/pure_drinking_water_1782473834335.jpg";
+// @ts-ignore
+import medicalHelpImage from "../assets/images/medical_treatment_help_1782473815510.jpg";
+// @ts-ignore
+import qualityEducationImage from "../assets/images/quality_education_1782473853014.jpg";
+
+const SLIDESHOW_IMAGES = [
+  { src: refugeeChildImage, alt: "Humanitarian Focus Child Portrait" },
+  { src: volunteerFoodImage, alt: "Volunteer Food Delivery and Support" },
+  { src: pureWaterImage, alt: "Pure Drinking Water Infrastructure" },
+  { src: medicalHelpImage, alt: "Primary Healthcare & Pediatric Screening" },
+  { src: qualityEducationImage, alt: "Empowering Rural Community Classrooms" }
+];
 
 interface HeroProps {
   onDonateClick: () => void;
@@ -9,6 +26,14 @@ interface HeroProps {
 }
 
 export default function Hero({ onDonateClick, onExploreClick }: HeroProps) {
+  const [currentIdx, setCurrentIdx] = useState(0);
+    useEffect(() => {
+      const timer = setInterval(() => {
+        setCurrentIdx((prev) => (prev + 1) % SLIDESHOW_IMAGES.length);
+      }, 5000);
+      return () => clearInterval(timer);
+    }, []);
+
   return (
     <section
       className="relative min-h-screen bg-secondary text-white flex flex-col justify-center overflow-hidden"
@@ -16,12 +41,20 @@ export default function Hero({ onDonateClick, onExploreClick }: HeroProps) {
     >
       {/* Full-bleed Background Image with multi-direction fades using the primary color */}
       <div className="absolute inset-0 z-0 overflow-hidden" id="hero-bg-container">
-        <img
-          src={refugeeChildImage}
-          alt="Humanitarian Focus Portrait"
-          className="w-full h-full object-cover object-center scale-105"
-          referrerPolicy="no-referrer"
-        />
+        <AnimatePresence mode="popLayout">
+          <motion.img
+            key={currentIdx}
+            src={SLIDESHOW_IMAGES[currentIdx].src}
+            alt={SLIDESHOW_IMAGES[currentIdx].alt}
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1.05 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute inset-0 w-full h-full object-cover object-center"
+            referrerPolicy="no-referrer"
+          />
+        </AnimatePresence>
+
         {/* Fades using the primary and secondary colors */}
         {/* 1. Right to Left Fade (Primary color blend & Dark slate overlay for text readability) */}
         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-secondary via-secondary/45 to-transparent z-10" />

@@ -23,6 +23,11 @@ import {
 
 
 import DonationWidget from "./DonationWidget";
+import Causes from "./Causes";
+import Policies from "./Policies";
+import { Campaign } from "../types";
+import { PolicyItem } from "../data/policiesData";
+import { campaignsData } from "../data";
 
 // Image Imports
 // @ts-ignore
@@ -48,12 +53,24 @@ interface AboutPageProps {
   onDonateClick: () => void;
   onJoinClick: () => void;
   onBackToHome: () => void;
+  campaigns?: Campaign[];
+  onDonateCampaignClick?: (campaign: Campaign) => void;
+  onViewAllProjects?: () => void;
+  onPolicySelect?: (policy: PolicyItem) => void;
+  onViewAllResources?: () => void;
+  onQuickDonateSubmit?: (amount: number, isKidSupport: boolean) => void;
 }
 
 export default function AboutPage({
   onDonateClick,
   onJoinClick,
   onBackToHome,
+  campaigns = campaignsData,
+  onDonateCampaignClick,
+  onViewAllProjects,
+  onPolicySelect,
+  onViewAllResources,
+  onQuickDonateSubmit,
 }: AboutPageProps) {
   // Tabs for history section
   const [activeTab, setActiveTab] = useState<"mission" | "vision" | "history">("mission");
@@ -154,19 +171,24 @@ export default function AboutPage({
       {/* 2. Main About NGO Introduction Section */}
       <section className="py-14 bg-white" id="about-intro-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
             
             {/* Left Column: Organic Heart-Shape Photo Grid & Badge */}
             <div className="lg:col-span-6 relative flex justify-center lg:justify-start" id="about-intro-media">
-              {/* Double-layered organic design */}
-              <div className="relative z-10 w-full max-w-[450px] aspect-square rounded-[10%] overflow-hidden bg-primary-50/50 hover:scale-[1.01] transition-transform duration-500 shadow-2xl border border-primary-100 flex items-center justify-center">
-                <div className="absolute inset-4 rounded-[8%] overflow-hidden border-4 border-dashed border-primary/20" />
+              {/* Double-layered organic design resembling screenshot's custom shape */}
+              <div className="relative z-10 w-full max-w-[450px] aspect-square rounded-[10%] overflow-hidden bg-orange-50/50 hover:scale-[1.01] transition-transform duration-500 shadow-2xl border border-orange-100 flex items-center justify-center">
+                <div className="absolute inset-4 rounded-[8%] overflow-hidden border-4 border-dashed border-[#ec5b2d]/20" />
                 <img
                   src={handsHoldingHeartImage}
                   alt="Hands holding red wooden heart"
                   className="w-[90%] h-[90%] object-cover rounded-[12%] shadow-lg"
                   referrerPolicy="no-referrer"
                 />
+                
+                {/* Floating Map Pin Icon or heart detail as shown in screen */}
+                <div className="absolute top-8 left-8 w-16 h-16 bg-[#ec5b2d] rounded-full flex items-center justify-center text-white shadow-lg animate-pulse">
+                  <Heart className="w-8 h-8 fill-white" />
+                </div>
               </div>
 
               {/* Overlapping Years of Experience orange badge */}
@@ -174,7 +196,7 @@ export default function AboutPage({
                 initial={{ scale: 0.9, opacity: 0 }}
                 whileInView={{ scale: 1, opacity: 1 }}
                 viewport={{ once: true }}
-                className="absolute bottom-6 left-96 md:-right-4 bg-primary text-white px-6 py-4 rounded-3xl shadow-2xl z-20 text-center max-w-[140px]"
+                className="absolute bottom-6 right-2 md:-right-4 bg-primary text-white px-8 py-6 rounded-3xl shadow-2xl z-20 text-center max-w-[240px]"
                 id="about-badge-experience"
               >
                 <div className="font-display font-black text-5xl tracking-tight">9+</div>
@@ -461,6 +483,32 @@ export default function AboutPage({
           </div>
         </div>
       </section>
+
+      
+      {/* 5.5. Donation Section */}
+      <section className="py-20 bg-white" id="quick-donation">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <DonationWidget
+            onDonateSubmit={(amount, isKidSupport) => {
+              if (onQuickDonateSubmit) {
+                onQuickDonateSubmit(amount, isKidSupport);
+              } else {
+                onDonateClick();
+              }
+            }}
+          />
+        </div>
+      </section>
+
+      {/* 6. Policies & Frameworks Section */}
+      <Policies
+        onPolicySelect={(policy) => {
+          if (onPolicySelect) {
+            onPolicySelect(policy);
+          }
+        }}
+        onViewAllResources={onViewAllResources}
+      />
     </div>
   );
 }

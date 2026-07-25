@@ -77,10 +77,6 @@ EYPD Governance Document - Certified & Authenticated
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Policies</span>
           </button>
-          
-          <span className="text-xs font-mono text-gray-400">
-            SECURE REPOSITORY // OFFICIAL DOCUMENT
-          </span>
         </div>
       </div>
 

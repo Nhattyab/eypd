@@ -1,1482 +1,1549 @@
-import { useState, useMemo, FormEvent } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { Project, DetailedBlogPost, ProjectContentSection, ContactMessage, AppNotification } from "../types";
 import {
-  Lock,
-  User,
+  FolderHeart,
+  BookOpen,
   Plus,
-  Edit2,
   Trash2,
-  FileText,
-  Briefcase,
-  LogOut,
-  ChevronRight,
-  Sparkles,
-  Eye,
-  CheckCircle,
-  HelpCircle,
-  Image as ImageIcon,
-  DollarSign,
-  MapPin,
-  Calendar,
+  Edit2,
+  Check,
   X,
-  CornerDownRight,
-  Info,
   Upload,
-  Link
+  Layers,
+  Heart,
+  DollarSign,
+  Calendar,
+  MapPin,
+  Tag,
+  Quote,
+  Loader2,
+  ListPlus,
+  Mail,
+  Bell,
+  LogOut,
+  Inbox,
+  Eye,
+  CheckSquare
 } from "lucide-react";
-import { Project } from "../data/projectsData";
-import { DetailedBlogPost } from "../data/blogData";
-import { ToastType } from "./Toast";
 
 interface AdminPanelProps {
-  onBackToHome: () => void;
   projects: Project[];
   blogs: DetailedBlogPost[];
   onUpdateProjects: (updated: Project[]) => void;
   onUpdateBlogs: (updated: DetailedBlogPost[]) => void;
-  addToast: (type: ToastType, title: string, message: string) => void;
+  addToast: (type: "success" | "error" | "info" | "warning", title: string, message: string) => void;
+  onBackToHome?: () => void;
 }
 
-// Preset images to make adding items super quick and visual
-const PRESET_IMAGES = [
-  { label: "Healthy Food & Nutrition", url: "https://images.unsplash.com/photo-1542810634-71277d95dcbb?q=80&w=800" },
-  { label: "Clean Water & Borehole", url: "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?q=80&w=800" },
-  { label: "Child Literacy & Education", url: "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=800" },
-  { label: "Pediatric Clinical Care", url: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=800" },
-  { label: "Community Support & Help", url: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?q=80&w=800" }
-];
-
 export default function AdminPanel({
-  onBackToHome,
   projects,
   blogs,
   onUpdateProjects,
   onUpdateBlogs,
-  addToast
+  addToast,
+  onBackToHome
 }: AdminPanelProps) {
-  // Authentication State
+  const [activeTab, setActiveTab] = useState<"projects" | "blogs" | "contacts">("projects");
+
+  // Admin authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem("charitics_admin_logged") === "true";
+    return localStorage.getItem("admin_authenticated") === "true";
   });
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
 
-  // Dashboard state
-  const [activeTab, setActiveTab] = useState<"projects" | "blogs">("projects");
-  const [projectSearch, setProjectSearch] = useState("");
-  const [blogSearch, setBlogSearch] = useState("");
+  // Contact messages state
+  const [contacts, setContacts] = useState<ContactMessage[]>([]);
+  const [isContactsLoading, setIsContactsLoading] = useState(false);
 
-  // Editor Modal States
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  // Notifications state
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Fetch initial notifications and contacts
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchNotifications();
+      fetchContacts();
+    }
+  }, [isAuthenticated]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  };
+
+  const fetchContacts = async () => {
+    setIsContactsLoading(true);
+    try {
+      const res = await fetch("/api/contacts");
+      if (res.ok) {
+        const data = await res.json();
+        setContacts(data);
+      }
+    } catch (err) {
+      console.error("Error fetching contacts:", err);
+    } finally {
+      setIsContactsLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username.trim() === "admin" && password === "password") {
+      setIsAuthenticated(true);
+      localStorage.setItem("admin_authenticated", "true");
+      addToast("success", "Access Granted", "Successfully authenticated as administrator.");
+      setLoginError("");
+    } else {
+      setLoginError("Invalid username or password. Please use standard administrator credentials.");
+      addToast("error", "Authentication Failed", "Incorrect username or password.");
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem("admin_authenticated");
+    addToast("info", "Logged Out", "You have successfully logged out of the admin console.");
+  };
+
+  const handleMarkNotificationsRead = async () => {
+    try {
+      const res = await fetch("/api/notifications/mark-read", { method: "POST" });
+      if (res.ok) {
+        fetchNotifications();
+        addToast("success", "Notifications Read", "All notifications marked as read.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleClearNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications", { method: "DELETE" });
+      if (res.ok) {
+        fetchNotifications();
+        addToast("success", "Notifications Cleared", "All notifications cleared.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkContactRead = async (id: string) => {
+    try {
+      const res = await fetch(`/api/contacts/${id}/read`, { method: "POST" });
+      if (res.ok) {
+        fetchContacts();
+        addToast("success", "Message Read", "Marked message as read.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteContact = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this message?")) return;
+    try {
+      const res = await fetch(`/api/contacts/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchContacts();
+        addToast("success", "Message Deleted", "Message deleted from database.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Loading/saving state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form toggles
+  const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
+  const [isBlogFormOpen, setIsBlogFormOpen] = useState(false);
+
+  // Editing targets
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-
-  const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
   const [editingBlog, setEditingBlog] = useState<DetailedBlogPost | null>(null);
 
-  // Form Field States (Project)
-  const [pTitle, setPTitle] = useState("");
-  const [pSubtitle, setPSubtitle] = useState("");
-  const [pCategory, setPCategory] = useState<"Care" | "Medical" | "Nutrition" | "Water" | "Education">("Care");
-  const [pImage, setPImage] = useState("");
-  const [pDescription, setPDescription] = useState("");
-  const [pLocation, setPLocation] = useState("");
-  const [pDate, setPDate] = useState("");
-  const [pTargetAmount, setPTargetAmount] = useState<number>(10000);
-  const [pRaisedAmount, setPRaisedAmount] = useState<number>(0);
-  const [pHighlighted, setPHighlighted] = useState(false);
-  const [pAuthor, setPAuthor] = useState("");
-  const [pTags, setPTags] = useState("");
-  const [pChallengeSolution, setPChallengeSolution] = useState("");
-  const [pFinalResult, setPFinalResult] = useState("");
+  // Project Form States
+  const [projTitle, setProjTitle] = useState("");
+  const [projSubtitle, setProjSubtitle] = useState("");
+  const [projCategory, setProjCategory] = useState("Care");
+  const [projImage, setProjImage] = useState("");
+  const [projDescription, setProjDescription] = useState("");
+  const [projLocation, setProjLocation] = useState("");
+  const [projDate, setProjDate] = useState("");
+  const [projTargetAmount, setProjTargetAmount] = useState<number>(10000);
+  const [projRaisedAmount, setProjRaisedAmount] = useState<number>(0);
+  const [projHighlighted, setProjHighlighted] = useState(false);
+  const [projAuthor, setProjAuthor] = useState("Admin");
+  const [projTags, setProjTags] = useState("");
+  const [projQuote, setProjQuote] = useState("");
+  const [projChallengeSolution, setProjChallengeSolution] = useState("");
+  const [projFinalResult, setProjFinalResult] = useState("");
+  const [projContentSections, setProjContentSections] = useState<ProjectContentSection[]>([]);
 
-  // Form Field States (Blog)
-  const [bTitle, setBTitle] = useState("");
-  const [bExcerpt, setBExcerpt] = useState("");
-  const [bCategory, setBCategory] = useState("");
-  const [bDate, setBDate] = useState("");
-  const [bImage, setBImage] = useState("");
-  const [bAuthor, setBAuthor] = useState("");
-  const [bQuote, setBQuote] = useState("");
-  const [bTags, setBTags] = useState("");
-  const [bContentParagraphs, setBContentParagraphs] = useState("");
+  // Temp Content Section input for Project
+  const [tempSecTitle, setTempSecTitle] = useState("");
+  const [tempSecParagraph, setTempSecParagraph] = useState("");
 
-  // Local File Upload states
-  const [pInputMode, setPInputMode] = useState<"file" | "url">("file");
-  const [bInputMode, setBInputMode] = useState<"file" | "url">("file");
-  const [pDragActive, setPDragActive] = useState<boolean>(false);
-  const [bDragActive, setBDragActive] = useState<boolean>(false);
+  // Blog Form States
+  const [blogTitle, setBlogTitle] = useState("");
+  const [blogExcerpt, setBlogExcerpt] = useState("");
+  const [blogCategory, setBlogCategory] = useState("Donation");
+  const [blogImage, setBlogImage] = useState("");
+  const [blogAuthor, setBlogAuthor] = useState("Admin");
+  const [blogDate, setBlogDate] = useState("");
+  const [blogQuote, setBlogQuote] = useState("");
+  const [blogTags, setBlogTags] = useState("");
+  const [blogContentParagraphs, setBlogContentParagraphs] = useState<string[]>([]);
+  const [tempParagraph, setTempParagraph] = useState("");
 
-  // Helper for FileReader uploads
-  const handleImageUpload = (file: File, type: "project" | "blog") => {
-    if (!file.type.startsWith("image/")) {
-      addToast("warning", "Invalid File Type", "Please select a valid image file.");
+  // Base64 helper
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: "project" | "blog") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      addToast("warning", "File too large", "Please upload an image smaller than 2MB.");
       return;
     }
+
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        if (type === "project") {
-          setPImage(result);
-        } else {
-          setBImage(result);
-        }
-        addToast("success", "Image Loaded", "Your local file has been encoded and applied.");
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      if (type === "project") {
+        setProjImage(base64String);
+      } else {
+        setBlogImage(base64String);
       }
-    };
-    reader.onerror = () => {
-      addToast("error", "Upload Failed", "Failed to read the local image file.");
+      addToast("success", "Image Uploaded", "Thumbnail converted successfully.");
     };
     reader.readAsDataURL(file);
   };
 
-  // Handles Admin Login
-  const handleLogin = (e: FormEvent) => {
+  // Open creation forms
+  const openNewProjectForm = () => {
+    setEditingProject(null);
+    setProjTitle("");
+    setProjSubtitle("");
+    setProjCategory("Care");
+    setProjImage("");
+    setProjDescription("");
+    setProjLocation("");
+    setProjDate(new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }));
+    setProjTargetAmount(10000);
+    setProjRaisedAmount(0);
+    setProjHighlighted(false);
+    setProjAuthor("Admin");
+    setProjTags("");
+    setProjQuote("");
+    setProjChallengeSolution("");
+    setProjFinalResult("");
+    setProjContentSections([]);
+    setTempSecTitle("");
+    setTempSecParagraph("");
+    setIsProjectFormOpen(true);
+  };
+
+  const openNewBlogForm = () => {
+    setEditingBlog(null);
+    setBlogTitle("");
+    setBlogExcerpt("");
+    setBlogCategory("Donation");
+    setBlogImage("");
+    setBlogAuthor("Admin");
+    setBlogDate(new Date().toLocaleDateString("en-US", { day: "numeric", month: "short" }));
+    setBlogQuote("");
+    setBlogTags("");
+    setBlogContentParagraphs([]);
+    setTempParagraph("");
+    setIsBlogFormOpen(true);
+  };
+
+  // Load project for edit
+  const startEditProject = (p: Project) => {
+    setEditingProject(p);
+    setProjTitle(p.title);
+    setProjSubtitle(p.subtitle);
+    setProjCategory(p.category);
+    setProjImage(p.image);
+    setProjDescription(p.description);
+    setProjLocation(p.location);
+    setProjDate(p.date);
+    setProjTargetAmount(p.targetAmount);
+    setProjRaisedAmount(p.raisedAmount);
+    setProjHighlighted(Boolean(p.highlighted));
+    setProjAuthor(p.author);
+    setProjTags(p.tags ? p.tags.join(", ") : "");
+    setProjQuote(p.quote || "");
+    setProjChallengeSolution(p.challengeSolution || "");
+    setProjFinalResult(p.finalResult || "");
+    setProjContentSections(p.content || []);
+    setTempSecTitle("");
+    setTempSecParagraph("");
+    setIsProjectFormOpen(true);
+  };
+
+  // Load blog for edit
+  const startEditBlog = (b: DetailedBlogPost) => {
+    setEditingBlog(b);
+    setBlogTitle(b.title);
+    setBlogExcerpt(b.excerpt);
+    setBlogCategory(b.category);
+    setBlogImage(b.image);
+    setBlogAuthor(b.author);
+    setBlogDate(b.date);
+    setBlogQuote(b.quote || "");
+    setBlogTags(b.tags ? b.tags.join(", ") : "");
+    setBlogContentParagraphs(b.content || []);
+    setTempParagraph("");
+    setIsBlogFormOpen(true);
+  };
+
+  // CRUD PROJECT
+  const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim() === "admin" && password === "admin123") {
-      setIsAuthenticated(true);
-      localStorage.setItem("charitics_admin_logged", "true");
-      setLoginError("");
-      addToast("success", "Login Successful", "Welcome back to the administrator panel.");
-    } else {
-      setLoginError("Invalid admin username or password. Please try again.");
-      addToast("error", "Access Denied", "Please use the correct credentials displayed in the helper box.");
-    }
-  };
-
-  // Handles Logout
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem("charitics_admin_logged");
-    addToast("info", "Logged Out", "You have successfully closed your administration session.");
-  };
-
-  // FILTERED PROJECTS
-  const filteredProjects = useMemo(() => {
-    return projects.filter((p) =>
-      p.title.toLowerCase().includes(projectSearch.toLowerCase()) ||
-      p.category.toLowerCase().includes(projectSearch.toLowerCase()) ||
-      p.location.toLowerCase().includes(projectSearch.toLowerCase())
-    );
-  }, [projects, projectSearch]);
-
-  // FILTERED BLOGS
-  const filteredBlogs = useMemo(() => {
-    return blogs.filter((b) =>
-      b.title.toLowerCase().includes(blogSearch.toLowerCase()) ||
-      b.category.toLowerCase().includes(blogSearch.toLowerCase()) ||
-      b.author.toLowerCase().includes(blogSearch.toLowerCase())
-    );
-  }, [blogs, blogSearch]);
-
-  // OPEN PROJECT MODAL FOR ADD/EDIT
-  const openProjectModal = (project: Project | null = null) => {
-    if (project) {
-      setEditingProject(project);
-      setPTitle(project.title);
-      setPSubtitle(project.subtitle || "");
-      setPCategory(project.category);
-      setPImage(project.image);
-      setPDescription(project.description);
-      setPLocation(project.location);
-      setPDate(project.date || "12 July, 2026");
-      setPTargetAmount(project.targetAmount);
-      setPRaisedAmount(project.raisedAmount);
-      setPHighlighted(!!project.highlighted);
-      setPAuthor(project.author || "Admin");
-      setPTags(project.tags || "");
-      setPChallengeSolution(project.challengeSolution || "");
-      setPFinalResult(project.finalResult || "");
-    } else {
-      setEditingProject(null);
-      setPTitle("");
-      setPSubtitle("");
-      setPCategory("Care");
-      setPImage(PRESET_IMAGES[0].url);
-      setPDescription("");
-      setPLocation("Rangpur Zoo Region");
-      setPDate("11 July, 2026");
-      setPTargetAmount(25000);
-      setPRaisedAmount(0);
-      setPHighlighted(false);
-      setPAuthor("Admin");
-      setPTags("Sanitation, Care");
-      setPChallengeSolution("Setting up distribution structures off-grid posed critical challenges, especially regarding localized logistics and material transport.");
-      setPFinalResult("The installation was successfully deployed, serving hundreds of individuals and improving water-borne safety by 40%.");
-    }
-    setIsProjectModalOpen(true);
-  };
-
-  // SAVE PROJECT HANDLER (ADD / EDIT)
-  const handleSaveProject = (e: FormEvent) => {
-    e.preventDefault();
-    if (!pTitle.trim() || !pDescription.trim() || !pLocation.trim()) {
-      addToast("warning", "Missing Fields", "Please populate all mandatory fields.");
+    if (!projTitle.trim()) {
+      addToast("warning", "Missing fields", "Campaign title is required.");
       return;
     }
 
-    if (editingProject) {
-      // EDIT
-      const updated = projects.map((p) => {
-        if (p.id === editingProject.id) {
-          return {
-            ...p,
-            title: pTitle,
-            subtitle: pSubtitle,
-            category: pCategory,
-            image: pImage,
-            description: pDescription,
-            location: pLocation,
-            date: pDate,
-            targetAmount: Number(pTargetAmount),
-            raisedAmount: Number(pRaisedAmount),
-            highlighted: pHighlighted,
-            author: pAuthor,
-            tags: pTags,
-            challengeSolution: pChallengeSolution,
-            finalResult: pFinalResult
-          };
-        }
-        return p;
-      });
-      onUpdateProjects(updated);
-      addToast("success", "Project Updated", `"${pTitle}" has been updated successfully.`);
-    } else {
-      // ADD NEW
-      const newProject: Project = {
-        id: `project-${Date.now()}`,
-        title: pTitle,
-        subtitle: pSubtitle,
-        category: pCategory,
-        image: pImage,
-        colSpan: "lg:col-span-4 md:col-span-5", // default
-        aspectRatio: "aspect-[4/5]",
-        description: pDescription,
-        location: pLocation,
-        date: pDate,
-        targetAmount: Number(pTargetAmount),
-        raisedAmount: Number(pRaisedAmount),
-        highlighted: pHighlighted,
-        author: pAuthor,
-        tags: pTags,
-        challengeSolution: pChallengeSolution,
-        finalResult: pFinalResult
-      };
-      onUpdateProjects([newProject, ...projects]);
-      addToast("success", "Project Created", `"${pTitle}" was successfully launched.`);
-    }
-    setIsProjectModalOpen(false);
-  };
-
-  // DELETE PROJECT
-  const handleDeleteProject = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete project: "${name}"? This action cannot be undone.`)) {
-      const updated = projects.filter((p) => p.id !== id);
-      onUpdateProjects(updated);
-      addToast("success", "Project Deleted", `"${name}" was successfully deleted from campaigns.`);
-    }
-  };
-
-  // OPEN BLOG MODAL FOR ADD/EDIT
-  const openBlogModal = (blog: DetailedBlogPost | null = null) => {
-    if (blog) {
-      setEditingBlog(blog);
-      setBTitle(blog.title);
-      setBExcerpt(blog.excerpt);
-      setBCategory(blog.category);
-      setBDate(blog.date);
-      setBImage(blog.image);
-      setBAuthor(blog.author);
-      setBQuote(blog.quote || "");
-      setBTags(blog.tags ? blog.tags.join(", ") : "");
-      setBContentParagraphs(blog.content ? blog.content.join("\n\n") : "");
-    } else {
-      setEditingBlog(null);
-      setBTitle("");
-      setBExcerpt("");
-      setBCategory("Charity");
-      setBDate("11 July");
-      setBImage(PRESET_IMAGES[2].url);
-      setBAuthor("Admin");
-      setBQuote("Every contribution, no matter the size, represents a step toward universal human dignity and access.");
-      setBTags("Education, Giving");
-      setBContentParagraphs(
-        "Access to basic education unlocks hours of growth and keeps community youth in clean, productive environments.\n\nOur field volunteers have established localized training spaces where interactive tools help children acquire essential computational skills."
-      );
-    }
-    setIsBlogModalOpen(true);
-  };
-
-  // SAVE BLOG HANDLER (ADD / EDIT)
-  const handleSaveBlog = (e: FormEvent) => {
-    e.preventDefault();
-    if (!bTitle.trim() || !bExcerpt.trim() || !bContentParagraphs.trim()) {
-      addToast("warning", "Missing Fields", "Please populate all mandatory fields.");
-      return;
-    }
-
-    const paragraphs = bContentParagraphs
-      .split("\n\n")
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
-
-    const tagArray = bTags
+    setIsSubmitting(true);
+    const parsedTags = projTags
       .split(",")
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
-    if (editingBlog) {
-      // EDIT
-      const updated = blogs.map((b) => {
-        if (b.id === editingBlog.id) {
-          return {
-            ...b,
-            title: bTitle,
-            excerpt: bExcerpt,
-            category: bCategory,
-            date: bDate,
-            image: bImage,
-            author: bAuthor,
-            quote: bQuote,
-            tags: tagArray,
-            content: paragraphs
-          };
-        }
-        return b;
+    const projectData: Project = {
+      id: editingProject ? editingProject.id : `project-${Date.now()}`,
+      title: projTitle.trim(),
+      subtitle: projSubtitle.trim(),
+      category: projCategory,
+      image: projImage || "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?q=80&w=600",
+      description: projDescription.trim(),
+      location: projLocation.trim(),
+      date: projDate.trim(),
+      targetAmount: Number(projTargetAmount),
+      raisedAmount: Number(projRaisedAmount),
+      highlighted: projHighlighted,
+      author: projAuthor.trim(),
+      tags: parsedTags,
+      quote: projQuote.trim(),
+      challengeSolution: projChallengeSolution.trim(),
+      finalResult: projFinalResult.trim(),
+      content: projContentSections,
+      comments: editingProject ? editingProject.comments : [],
+      colSpan: editingProject?.colSpan || "lg:col-span-4 md:col-span-6",
+      aspectRatio: editingProject?.aspectRatio || "aspect-square"
+    };
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(projectData)
       });
-      onUpdateBlogs(updated);
-      addToast("success", "Blog Post Updated", `"${bTitle}" has been saved.`);
-    } else {
-      // ADD NEW
-      const newBlog: DetailedBlogPost = {
-        id: `blog-${Date.now()}`,
-        title: bTitle,
-        excerpt: bExcerpt,
-        category: bCategory,
-        date: bDate,
-        image: bImage,
-        author: bAuthor,
-        quote: bQuote,
-        tags: tagArray,
-        content: paragraphs,
-        comments: []
-      };
-      onUpdateBlogs([newBlog, ...blogs]);
-      addToast("success", "Blog Post Published", `"${bTitle}" is now live in editorial journals.`);
+
+      if (response.ok) {
+        addToast(
+          "success",
+          editingProject ? "Campaign Updated" : "Campaign Created",
+          `Successfully saved "${projTitle.trim()}" in the database.`
+        );
+        setIsProjectFormOpen(false);
+        setEditingProject(null);
+        // Refresh project list
+        const refreshedRes = await fetch("/api/projects");
+        if (refreshedRes.ok) {
+          const freshData = await refreshedRes.json();
+          onUpdateProjects(freshData);
+        }
+      } else {
+        const err = await response.json();
+        addToast("error", "Failed to save", err.error || "Database rejection.");
+      }
+    } catch (err: any) {
+      addToast("error", "Network Error", err.message || "Could not reach database API.");
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsBlogModalOpen(false);
   };
 
-  // DELETE BLOG POST
-  const handleDeleteBlog = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete blog: "${name}"?`)) {
-      const updated = blogs.filter((b) => b.id !== id);
-      onUpdateBlogs(updated);
-      addToast("success", "Blog Post Deleted", `"${name}" was successfully removed.`);
+  const handleDeleteProject = async (id: string, title: string) => {
+    if (!window.confirm(`Are you absolutely sure you want to delete campaign "${title}" from the database?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        addToast("success", "Campaign Deleted", `Deleted "${title}" successfully.`);
+        // Refresh project list
+        const refreshedRes = await fetch("/api/projects");
+        if (refreshedRes.ok) {
+          const freshData = await refreshedRes.json();
+          onUpdateProjects(freshData);
+        }
+      } else {
+        addToast("error", "Failed to delete", "Database refused request.");
+      }
+    } catch (err: any) {
+      addToast("error", "Delete Error", err.message);
     }
   };
+
+  // CRUD BLOG
+  const handleSaveBlog = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blogTitle.trim()) {
+      addToast("warning", "Missing fields", "Journal title is required.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const parsedTags = blogTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    const postData: DetailedBlogPost = {
+      id: editingBlog ? editingBlog.id : `blog-${Date.now()}`,
+      title: blogTitle.trim(),
+      excerpt: blogExcerpt.trim(),
+      category: blogCategory,
+      image: blogImage || "https://images.unsplash.com/photo-1542810634-71277d95dcbb?q=80&w=600",
+      author: blogAuthor.trim(),
+      date: blogDate.trim(),
+      quote: blogQuote.trim(),
+      tags: parsedTags,
+      content: blogContentParagraphs,
+      comments: editingBlog ? editingBlog.comments : []
+    };
+
+    try {
+      const response = await fetch("/api/blogs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(postData)
+      });
+
+      if (response.ok) {
+        addToast(
+          "success",
+          editingBlog ? "Journal Updated" : "Journal Created",
+          `Successfully saved "${blogTitle.trim()}" in the database.`
+        );
+        setIsBlogFormOpen(false);
+        setEditingBlog(null);
+        // Refresh blog list
+        const refreshedRes = await fetch("/api/blogs");
+        if (refreshedRes.ok) {
+          const freshData = await refreshedRes.json();
+          onUpdateBlogs(freshData);
+        }
+      } else {
+        const err = await response.json();
+        addToast("error", "Failed to save", err.error || "Database rejection.");
+      }
+    } catch (err: any) {
+      addToast("error", "Network Error", err.message || "Could not reach database API.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteBlog = async (id: string, title: string) => {
+    if (!window.confirm(`Are you absolutely sure you want to delete journal entry "${title}" from the database?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/blogs/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        addToast("success", "Journal Deleted", `Deleted "${title}" successfully.`);
+        // Refresh list
+        const refreshedRes = await fetch("/api/blogs");
+        if (refreshedRes.ok) {
+          const freshData = await refreshedRes.json();
+          onUpdateBlogs(freshData);
+        }
+      } else {
+        addToast("error", "Failed to delete", "Database refused request.");
+      }
+    } catch (err: any) {
+      addToast("error", "Delete Error", err.message);
+    }
+  };
+
+  // Content block helpers
+  const addContentSection = () => {
+    if (!tempSecTitle.trim() || !tempSecParagraph.trim()) return;
+    setProjContentSections([
+      ...projContentSections,
+      { title: tempSecTitle.trim(), paragraph: tempSecParagraph.trim() }
+    ]);
+    setTempSecTitle("");
+    setTempSecParagraph("");
+  };
+
+  const removeContentSection = (index: number) => {
+    setProjContentSections(projContentSections.filter((_, i) => i !== index));
+  };
+
+  const addBlogParagraph = () => {
+    if (!tempParagraph.trim()) return;
+    setBlogContentParagraphs([...blogContentParagraphs, tempParagraph.trim()]);
+    setTempParagraph("");
+  };
+
+  const removeBlogParagraph = (index: number) => {
+    setBlogContentParagraphs(blogContentParagraphs.filter((_, i) => i !== index));
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="bg-gray-55 min-h-[85vh] flex items-center justify-center py-20 px-4 sm:px-6 lg:px-8" id="admin-login-container">
+        <div className="max-w-md w-full bg-white rounded-[32px] border border-gray-100 shadow-xl p-8 sm:p-10 relative overflow-hidden">
+          {/* Accent decoration */}
+          <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-emerald-500 via-[#ff5e14] to-emerald-700" />
+          
+          <div className="text-center space-y-3 mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-50 text-[#ff5e14] rounded-2xl mb-2">
+              <FolderHeart className="w-8 h-8 shrink-0" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-display font-black text-gray-900 tracking-tight">Admin Console Access</h2>
+            <p className="text-sm text-gray-500">Please authenticate to manage persistent database campaigns, journals, and contact messages.</p>
+          </div>
+
+          <form onSubmit={handleLoginSubmit} className="space-y-5" id="admin-login-form">
+            {loginError && (
+              <div className="bg-red-50 text-red-700 text-xs font-semibold p-4 rounded-2xl border border-red-100 leading-relaxed" id="login-error-msg">
+                {loginError}
+              </div>
+            )}
+
+            <div className="space-y-1.5 text-left">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Username</label>
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. admin"
+                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-2xl px-5 py-4 text-sm text-[#0a1118] focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 placeholder-gray-400 font-sans transition-all"
+                id="login-username-input"
+              />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Password</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="e.g. password"
+                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-2xl px-5 py-4 text-sm text-[#0a1118] focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 placeholder-gray-400 font-sans transition-all"
+                id="login-password-input"
+              />
+              <span className="text-[10px] text-gray-400 block mt-1">
+                Hint: Use <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-bold">admin</span> / <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-bold">password</span>
+              </span>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-[#0a1118] hover:bg-emerald-600 text-white font-display font-bold text-sm rounded-full py-4 px-6 transition-all duration-300 cursor-pointer shadow-lg mt-2 flex items-center justify-center gap-2"
+              id="login-submit-btn"
+            >
+              <span>Authenticate Access</span>
+              <Check className="w-4 h-4" />
+            </button>
+
+            {onBackToHome && (
+              <button
+                type="button"
+                onClick={onBackToHome}
+                className="w-full border border-gray-200 hover:bg-gray-50 text-gray-600 font-display font-semibold text-xs rounded-full py-3.5 transition-all cursor-pointer mt-2"
+                id="login-back-btn"
+              >
+                Back to Public Site
+              </button>
+            )}
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-[#f8f9fa] min-h-screen pt-24 text-[#0a1118]" id="admin-view-root">
-      
-      {/* CASE A: LOGIN SCREEN */}
-      {!isAuthenticated ? (
-        <section className="py-20 flex items-center justify-center px-4" id="admin-login-screen">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md bg-white rounded-3xl p-8 sm:p-10 border border-gray-100 shadow-xl space-y-8 relative"
-          >
-            {/* Login Header Accent */}
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 bg-[#ff5e14]/10 text-[#ff5e14] rounded-full flex items-center justify-center mx-auto shadow-sm">
-                <Lock className="w-6 h-6" />
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-display font-black text-[#0a1118]">
-                Admin Portal
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-500 font-sans">
-                Sign in to manage active NGO campaigns and news articles.
-              </p>
-            </div>
+    <div className="bg-gray-50 min-h-screen py-10 px-4 sm:px-6 lg:px-8">
 
-            {/* Hint Box (Extremely helpful for preview/testing!) */}
-            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex gap-3 text-amber-900 text-xs font-sans leading-relaxed">
-              <Sparkles className="w-4 h-4 text-[#ff5e14] shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold text-[#ff5e14] block mb-1">Quick Evaluation Hint</span>
-                Use username <strong className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">admin</strong> and password <strong className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">admin123</strong> to log in instantly.
-              </div>
-            </div>
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Panel Banner */}
+        <div className="bg-gradient-to-r from-emerald-800 to-emerald-950 rounded-3xl p-8 sm:p-10 text-white mb-10 shadow-lg relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-emerald-700/10 rounded-l-full blur-2xl pointer-events-none" />
+          <div className="relative z-10 max-w-2xl">
+            <span className="text-emerald-300 font-bold tracking-wider uppercase text-xs block mb-2">
+              Database Core Console
+            </span>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Administrative Manager</h1>
+            <p className="text-emerald-100/90 mt-2 text-sm sm:text-base leading-relaxed">
+              Create, read, update, and delete live campaigns and journal entries. All administrative operations are written directly to the persistent SQLite3 relational database.
+            </p>
+          </div>
+          <div className="relative z-10 flex flex-wrap items-center gap-3 shrink-0">
+            {/* Notifications Button with Dropdown Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-3 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 text-white rounded-xl transition-all cursor-pointer backdrop-blur-sm shadow-sm flex items-center justify-center"
+                title="Notifications"
+                id="notifications-btn"
+              >
+                <Bell className="w-4 h-4" />
+                {notifications.some(n => !n.read) && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#ff5e14] rounded-full animate-pulse" />
+                )}
+              </button>
 
-            {/* Login Form */}
-            <form onSubmit={handleLogin} className="space-y-5" id="login-form">
-              {loginError && (
-                <div className="text-xs text-red-600 font-semibold bg-red-50 border border-red-200 p-3 rounded-xl">
-                  {loginError}
+              {/* Notifications Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 text-gray-800 z-50 animate-in fade-in slide-in-from-top-2 duration-150" id="notifications-dropdown">
+                  <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                    <span className="font-bold text-sm text-gray-900">Notifications</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleMarkNotificationsRead}
+                        className="text-[10px] text-emerald-600 hover:underline font-semibold"
+                      >
+                        Mark all read
+                      </button>
+                      <span className="text-gray-300 text-[10px]">|</span>
+                      <button
+                        onClick={handleClearNotifications}
+                        className="text-[10px] text-red-500 hover:underline font-semibold"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto divide-y divide-gray-50">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-xs text-gray-400">
+                        No recent notifications.
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div
+                          key={n.id}
+                          className={`px-4 py-3 text-xs flex flex-col gap-1 transition-colors text-left hover:bg-gray-50/50 cursor-pointer ${!n.read ? 'bg-emerald-50/20 font-medium' : ''}`}
+                          onClick={() => {
+                            if (n.type === 'contact') {
+                              setActiveTab('contacts');
+                              setIsProjectFormOpen(false);
+                              setIsBlogFormOpen(false);
+                            }
+                            setShowNotifications(false);
+                          }}
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-bold text-gray-900 line-clamp-1">{n.title}</span>
+                            <span className="text-[9px] text-gray-400 shrink-0">{n.date}</span>
+                          </div>
+                          <p className="text-gray-500 line-clamp-2">{n.message}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Username</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter admin"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-[#f8f9fa] border border-gray-200 rounded-2xl pl-11 pr-5 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e14]/15 focus:border-[#ff5e14] font-sans"
-                    id="login-username"
-                  />
-                </div>
-              </div>
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 text-white text-xs font-bold rounded-xl transition-all cursor-pointer backdrop-blur-sm shadow-sm flex items-center gap-1.5"
+              title="Logout Administrative Access"
+              id="admin-logout-btn"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Log out</span>
+            </button>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="password"
-                    required
-                    placeholder="Enter admin123"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-[#f8f9fa] border border-gray-200 rounded-2xl pl-11 pr-5 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e14]/15 focus:border-[#ff5e14] font-sans"
-                    id="login-password"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-[#0a1118] hover:bg-[#ff5e14] text-white font-display font-bold text-sm py-4 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 group shadow-md"
-                id="login-submit-btn"
-              >
-                <span>Access Dashboard</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </form>
-
-            {/* Back button */}
-            <div className="text-center pt-2">
+            {/* Exit Console Button */}
+            {onBackToHome && (
               <button
                 onClick={onBackToHome}
-                className="text-xs font-display font-bold text-gray-400 hover:text-[#ff5e14] transition-colors"
+                className="px-4 py-3 bg-white hover:bg-gray-100 text-[#0a1118] text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+                id="admin-exit-btn"
               >
-                ← Return to Public Website
-              </button>
-            </div>
-          </motion.div>
-        </section>
-      ) : (
-        /* CASE B: FULL ADMIN DASHBOARD */
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10" id="admin-dashboard-container">
-          
-          {/* Dashboard Header */}
-          <div className="bg-[#0a1118] text-white rounded-[32px] p-6 sm:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-xl relative overflow-hidden">
-            <div className="absolute right-0 bottom-0 top-0 w-1/3 opacity-5 pointer-events-none">
-              <Sparkles className="w-full h-full text-white" />
-            </div>
-            
-            <div className="space-y-2 relative z-10">
-              <div className="flex items-center gap-2 text-xs font-display font-bold text-[#ff5e14] uppercase tracking-widest">
-                <CheckCircle className="w-4 h-4 fill-[#ff5e14] text-white" />
-                <span>Authorized Management Portal</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-display font-black tracking-tight">
-                Charitics Executive Terminal
-              </h1>
-              <p className="text-sm text-gray-300 max-w-xl font-sans">
-                Welcome back, Administrator. Real-time controls to deploy emergency funding campaigns and news diaries.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 relative z-10 shrink-0">
-              <button
-                onClick={onBackToHome}
-                className="bg-white/10 hover:bg-white/15 text-white font-display font-bold text-xs px-5 py-3 rounded-full transition-all"
-                id="dashboard-back-btn"
-              >
-                Public Website
-              </button>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-display font-bold text-xs px-5 py-3 rounded-full flex items-center gap-2 transition-all"
-                id="dashboard-logout-btn"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Stats Panel */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6" id="admin-quick-stats">
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs flex items-center gap-5">
-              <div className="w-12 h-12 bg-[#ff5e14]/10 rounded-2xl flex items-center justify-center text-[#ff5e14] shrink-0">
-                <Briefcase className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block">Total Campaigns</span>
-                <span className="text-2xl font-display font-black text-secondary">{projects.length} Active</span>
-              </div>
-            </div>
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs flex items-center gap-5">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shrink-0">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block">News Diaries</span>
-                <span className="text-2xl font-display font-black text-secondary">{blogs.length} Published</span>
-              </div>
-            </div>
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs flex items-center gap-5">
-              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0">
-                <DollarSign className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider block">Aggregated Goal</span>
-                <span className="text-2xl font-display font-black text-secondary">
-                  ${projects.reduce((acc, p) => acc + p.targetAmount, 0).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Tab Selection Row */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-200/60 pb-5">
-            <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-gray-200/50 shadow-xs">
-              <button
-                onClick={() => setActiveTab("projects")}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-display font-bold text-xs transition-all ${
-                  activeTab === "projects"
-                    ? "bg-[#0a1118] text-white shadow-sm"
-                    : "text-gray-400 hover:text-gray-600"
-                }`}
-                id="tab-select-projects"
-              >
-                <Briefcase className="w-4 h-4" />
-                <span>Campaigns ({projects.length})</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("blogs")}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-display font-bold text-xs transition-all ${
-                  activeTab === "blogs"
-                    ? "bg-[#0a1118] text-white shadow-sm"
-                    : "text-gray-400 hover:text-gray-600"
-                }`}
-                id="tab-select-blogs"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Editorial Blogs ({blogs.length})</span>
-              </button>
-            </div>
-
-            {/* Action buttons depending on tab */}
-            {activeTab === "projects" ? (
-              <button
-                onClick={() => openProjectModal(null)}
-                className="bg-[#ff5e14] hover:bg-[#ff5e14]/90 text-white font-display font-bold text-xs px-6 py-3 rounded-full flex items-center gap-2 shadow-md transition-all self-stretch sm:self-auto cursor-pointer"
-                id="add-project-btn"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Deploy New Campaign</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => openBlogModal(null)}
-                className="bg-[#ff5e14] hover:bg-[#ff5e14]/90 text-white font-display font-bold text-xs px-6 py-3 rounded-full flex items-center gap-2 shadow-md transition-all self-stretch sm:self-auto cursor-pointer"
-                id="add-blog-btn"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Publish Blog Post</span>
+                Exit Console
               </button>
             )}
           </div>
 
-          {/* TAB CONTENT: PROJECTS */}
-          {activeTab === "projects" && (
-            <div className="space-y-6" id="projects-management-view">
-              {/* Search Bar */}
-              <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs flex items-center gap-3">
-                <input
-                  type="text"
-                  placeholder="Filter campaigns by title, category, or location..."
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                  className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-2.5 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                  id="search-projects-control"
-                />
-              </div>
+        </div>
 
-              {/* Projects Grid */}
-              {filteredProjects.length === 0 ? (
-                <div className="bg-white rounded-[32px] p-12 text-center text-gray-400 border border-dashed border-gray-200 space-y-2">
-                  <Briefcase className="w-12 h-12 text-gray-300 mx-auto" />
-                  <p className="text-sm font-semibold">No active projects found.</p>
-                  <p className="text-xs text-gray-400">Try modifying your search or click "Deploy New Campaign" to add one.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="admin-projects-grid">
-                  {filteredProjects.map((proj) => (
-                    <div
-                      key={proj.id}
-                      className="bg-white rounded-[32px] border border-gray-100 p-6 flex gap-5 hover:shadow-md transition-all relative group overflow-hidden"
-                      id={`manage-project-card-${proj.id}`}
-                    >
-                      {/* Flag for Highlighted */}
-                      {proj.highlighted && (
-                        <span className="absolute top-0 right-0 bg-[#ff5e14] text-white text-[9px] font-display font-extrabold uppercase px-3.5 py-1 rounded-bl-2xl shadow-sm tracking-wider">
-                          Featured
-                        </span>
-                      )}
-
-                      {/* Image Preview */}
-                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gray-100 overflow-hidden shrink-0 border border-gray-200/50">
-                        <img
-                          src={proj.image}
-                          alt={proj.title}
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-
-                      {/* Details */}
-                      <div className="flex flex-col justify-between flex-1 min-w-0 space-y-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-[10px] font-display font-extrabold text-[#ff5e14] uppercase tracking-wider">
-                            <span>{proj.category}</span>
-                            <span>•</span>
-                            <span className="text-gray-400 font-sans font-normal lowercase">{proj.location}</span>
-                          </div>
-                          <h3 className="font-display font-bold text-base text-[#0a1118] truncate pr-10">
-                            {proj.title}
-                          </h3>
-                          <p className="text-xs text-gray-400 line-clamp-2 pr-4 leading-relaxed">
-                            {proj.description}
-                          </p>
-                        </div>
-
-                        {/* Budget progress */}
-                        <div className="space-y-1 pr-4">
-                          <div className="flex justify-between text-[10px] font-sans text-gray-500">
-                            <span>Raised: ${proj.raisedAmount.toLocaleString()}</span>
-                            <span className="font-bold">Goal: ${proj.targetAmount.toLocaleString()}</span>
-                          </div>
-                          <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className="bg-[#ff5e14] h-full"
-                              style={{ width: `${Math.min(100, (proj.raisedAmount / proj.targetAmount) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Actions row */}
-                        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-                          <button
-                            onClick={() => openProjectModal(proj)}
-                            className="text-[#ff5e14] hover:bg-[#ff5e14]/5 rounded-lg px-3 py-1.5 text-xs font-display font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer"
-                            id={`edit-project-btn-${proj.id}`}
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span>Modify</span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProject(proj.id, proj.title)}
-                            className="text-red-500 hover:bg-red-50 rounded-lg px-3 py-1.5 text-xs font-display font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
-                            id={`delete-project-btn-${proj.id}`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Discard</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB CONTENT: BLOGS */}
-          {activeTab === "blogs" && (
-            <div className="space-y-6" id="blogs-management-view">
-              {/* Search Bar */}
-              <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs flex items-center gap-3">
-                <input
-                  type="text"
-                  placeholder="Filter blog posts by title, category, or author..."
-                  value={blogSearch}
-                  onChange={(e) => setBlogSearch(e.target.value)}
-                  className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-2.5 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                  id="search-blogs-control"
-                />
-              </div>
-
-              {/* Blogs List */}
-              {filteredBlogs.length === 0 ? (
-                <div className="bg-white rounded-[32px] p-12 text-center text-gray-400 border border-dashed border-gray-200 space-y-2">
-                  <FileText className="w-12 h-12 text-gray-300 mx-auto" />
-                  <p className="text-sm font-semibold">No blog posts found.</p>
-                  <p className="text-xs text-gray-400">Try adjusting your search criteria or write a new public journal diary.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="admin-blogs-grid">
-                  {filteredBlogs.map((post) => (
-                    <div
-                      key={post.id}
-                      className="bg-white rounded-[32px] border border-gray-100 p-6 flex gap-5 hover:shadow-md transition-all relative group"
-                      id={`manage-blog-card-${post.id}`}
-                    >
-                      {/* Image Preview */}
-                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gray-100 overflow-hidden shrink-0 border border-gray-200/50">
-                        <img
-                          src={post.image}
-                          alt={post.title}
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-
-                      {/* Details */}
-                      <div className="flex flex-col justify-between flex-1 min-w-0 space-y-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-[10px] font-display font-extrabold text-[#ff5e14] uppercase tracking-wider">
-                            <span>{post.category}</span>
-                            <span>•</span>
-                            <span className="text-gray-400 font-sans font-normal lowercase">By {post.author}</span>
-                          </div>
-                          <h3 className="font-display font-bold text-base text-[#0a1118] truncate pr-4">
-                            {post.title}
-                          </h3>
-                          <p className="text-xs text-gray-400 line-clamp-2 pr-4 leading-relaxed">
-                            {post.excerpt}
-                          </p>
-                        </div>
-
-                        {/* Date info */}
-                        <div className="text-[10px] font-mono text-gray-400">
-                          Published: {post.date}
-                        </div>
-
-                        {/* Actions row */}
-                        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-                          <button
-                            onClick={() => openBlogModal(post)}
-                            className="text-[#ff5e14] hover:bg-[#ff5e14]/5 rounded-lg px-3 py-1.5 text-xs font-display font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer"
-                            id={`edit-blog-btn-${post.id}`}
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span>Modify</span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteBlog(post.id, post.title)}
-                            className="text-red-500 hover:bg-red-50 rounded-lg px-3 py-1.5 text-xs font-display font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
-                            id={`delete-blog-btn-${post.id}`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Discard</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+        {/* Console Nav Tabs */}
+        <div className="flex border-b border-gray-200 mb-8 bg-white p-2 rounded-2xl shadow-sm">
+          <button
+            onClick={() => {
+              setActiveTab("projects");
+              setIsProjectFormOpen(false);
+              setIsBlogFormOpen(false);
+            }}
+            className={`flex-1 sm:flex-initial py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "projects"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/15"
+                : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+            }`}
+          >
+            <FolderHeart className="w-4 h-4" />
+            Active Campaigns ({projects.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("blogs");
+              setIsProjectFormOpen(false);
+              setIsBlogFormOpen(false);
+            }}
+            className={`flex-1 sm:flex-initial py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "blogs"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/15"
+                : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            Journals & Logs ({blogs.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("contacts");
+              setIsProjectFormOpen(false);
+              setIsBlogFormOpen(false);
+              fetchContacts();
+            }}
+            className={`flex-1 sm:flex-initial py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "contacts"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/15"
+                : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+            }`}
+          >
+            <Inbox className="w-4 h-4" />
+            Inbox Messages ({contacts.length})
+            {contacts.some(c => !c.read) && (
+              <span className="w-2 h-2 bg-[#ff5e14] rounded-full shrink-0" />
+            )}
+          </button>
 
         </div>
-      )}
 
-      {/* ----------------- MODAL SECTION ----------------- */}
-
-      {/* 1. PROJECT CREATION / MODIFICATION MODAL */}
-      <AnimatePresence>
-        {isProjectModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" id="project-form-modal">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsProjectModalOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-            />
-
-            {/* Modal Body */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-3xl bg-white rounded-[32px] shadow-2xl overflow-hidden max-h-[85vh] flex flex-col border border-gray-100"
-            >
-              {/* Header */}
-              <div className="bg-[#0a1118] text-white p-6 flex items-center justify-between border-b border-white/5">
-                <div>
-                  <h2 className="text-xl font-display font-black">
-                    {editingProject ? "Modify Campaign Settings" : "Deploy New Funding Campaign"}
-                  </h2>
-                  <p className="text-xs text-gray-400 font-sans mt-0.5">
-                    Fill in detailed operational structures for this humanitarian program.
-                  </p>
+        {/* CAMPAIGNS TAB CONTENT */}
+        {activeTab === "projects" && (
+          <div>
+            {!isProjectFormOpen ? (
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-6 mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Registered Campaigns</h2>
+                    <p className="text-sm text-gray-500">Live causes shown on the causes section and details page.</p>
+                  </div>
+                  <button
+                    onClick={openNewProjectForm}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Campaign
+                  </button>
                 </div>
-                <button
-                  onClick={() => setIsProjectModalOpen(false)}
-                  className="p-2 bg-white/10 hover:bg-white/15 text-white/80 rounded-full cursor-pointer transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+
+                {projects.length === 0 ? (
+                  <div className="text-center py-16 text-gray-400">
+                    <FolderHeart className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-base font-bold text-gray-500">No campaigns found in database.</p>
+                    <p className="text-xs text-gray-400 mt-1">Click &quot;Create Campaign&quot; to populate your first persistent record.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-xs font-extrabold text-gray-400 uppercase bg-gray-55">
+                          <th className="py-4 px-4">Campaign</th>
+                          <th className="py-4 px-4">Category</th>
+                          <th className="py-4 px-4">Goal Amount</th>
+                          <th className="py-4 px-4">Raised Amount</th>
+                          <th className="py-4 px-4">Featured</th>
+                          <th className="py-4 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {projects.map((p) => (
+                          <tr key={p.id} className="border-b border-gray-50 last:border-0 text-sm hover:bg-gray-50/50 transition-colors">
+                            <td className="py-4 px-4 flex items-center gap-3">
+                              <img
+                                src={p.image}
+                                alt={p.title}
+                                className="w-12 h-12 object-cover rounded-xl bg-gray-100"
+                              />
+                              <div className="max-w-xs truncate">
+                                <span className="font-bold text-gray-950 block">{p.title}</span>
+                                <span className="text-xs text-gray-400 block truncate">{p.subtitle}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className="bg-gray-100 text-gray-700 font-semibold px-2.5 py-1 rounded-lg text-xs">
+                                {p.category}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 font-bold text-gray-900">${p.targetAmount.toLocaleString()}</td>
+                            <td className="py-4 px-4 font-bold text-emerald-600">${p.raisedAmount.toLocaleString()}</td>
+                            <td className="py-4 px-4">
+                              {p.highlighted ? (
+                                <span className="bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-100">
+                                  Yes
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">No</span>
+                              )}
+                            </td>
+                            <td className="py-4 px-4 text-right">
+                              <div className="inline-flex gap-2">
+                                <button
+                                  onClick={() => startEditProject(p)}
+                                  className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProject(p.id, p.title)}
+                                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-
-              {/* Scrollable Content */}
-              <form onSubmit={handleSaveProject} className="p-6 overflow-y-auto space-y-6 flex-1 text-left">
-                
-                {/* 1. Row: Title & Subtitle */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                      <span>Campaign Title *</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Clean Safe Drinking Water"
-                      value={pTitle}
-                      onChange={(e) => setPTitle(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
+            ) : (
+              // CAMPAIGN EDIT / CREATE FORM
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-6 mb-8">
+                  <div>
+                    <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs block mb-1">
+                      Campaign Editor
+                    </span>
+                    <h2 className="text-2xl font-black text-gray-900">
+                      {editingProject ? `Edit: ${editingProject.title}` : "Create New Campaign"}
+                    </h2>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Subtitle / Short Hook</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Solar Wells & Sand Filtration"
-                      value={pSubtitle}
-                      onChange={(e) => setPSubtitle(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
+                  <button
+                    onClick={() => setIsProjectFormOpen(false)}
+                    className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
-                {/* 2. Row: Category & Location */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Operational Pillar *</label>
-                    <select
-                      value={pCategory}
-                      onChange={(e) => setPCategory(e.target.value as any)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    >
-                      <option value="Care">Care & Shelter</option>
-                      <option value="Medical">Medical Treatment</option>
-                      <option value="Nutrition">Nutrition & Meals</option>
-                      <option value="Water">Pure Water Supply</option>
-                      <option value="Education">Quality Education</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Regional Location *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Mek'ele Foothills, Ethiopia"
-                      value={pLocation}
-                      onChange={(e) => setPLocation(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Row: Date & Author */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Launch Date</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 11 July, 2026"
-                      value={pDate}
-                      onChange={(e) => setPDate(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Field Coordinator / Author</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Dr. Athena Jones"
-                      value={pAuthor}
-                      onChange={(e) => setPAuthor(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
-                </div>
-
-                {/* 4. Row: Target Amount & Raised Amount */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Required Funding ($ USD)</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                <form onSubmit={handleSaveProject} className="space-y-8">
+                  
+                  {/* Grid Layout of parameters */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Campaign Title</label>
                       <input
-                        type="number"
+                        type="text"
+                        value={projTitle}
+                        onChange={(e) => setProjTitle(e.target.value)}
+                        placeholder="e.g. Clean drinking water wells"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
                         required
-                        min={100}
-                        value={pTargetAmount}
-                        onChange={(e) => setPTargetAmount(Number(e.target.value))}
-                        className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl pl-8 pr-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans font-bold"
                       />
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Initially Gathered ($ USD)</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Campaign Subtitle</label>
+                      <input
+                        type="text"
+                        value={projSubtitle}
+                        onChange={(e) => setProjSubtitle(e.target.value)}
+                        placeholder="e.g. Solar powered biosand filtration"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Category</label>
+                      <select
+                        value={projCategory}
+                        onChange={(e) => setProjCategory(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      >
+                        <option value="Care">Care</option>
+                        <option value="Medical">Medical</option>
+                        <option value="Nutrition">Nutrition</option>
+                        <option value="Water">Water</option>
+                        <option value="Education">Education</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Author Name</label>
+                      <input
+                        type="text"
+                        value={projAuthor}
+                        onChange={(e) => setProjAuthor(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Target Amount ($)</label>
                       <input
                         type="number"
-                        min={0}
-                        value={pRaisedAmount}
-                        onChange={(e) => setPRaisedAmount(Number(e.target.value))}
-                        className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl pl-8 pr-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
+                        value={projTargetAmount}
+                        onChange={(e) => setProjTargetAmount(Number(e.target.value))}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                        min="1"
+                        required
                       />
                     </div>
-                  </div>
-                </div>
-
-                {/* 5. Row: Image Selection */}
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Campaign Image *</label>
-                    <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl text-[10px] font-display font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setPInputMode("file")}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          pInputMode === "file"
-                            ? "bg-white text-[#0a1118] shadow-xs"
-                            : "text-gray-400 hover:text-gray-600"
-                        }`}
-                      >
-                        Local File
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPInputMode("url")}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          pInputMode === "url"
-                            ? "bg-white text-[#0a1118] shadow-xs"
-                            : "text-gray-400 hover:text-gray-600"
-                        }`}
-                      >
-                        Web URL & Presets
-                      </button>
-                    </div>
-                  </div>
-
-                  {pInputMode === "file" ? (
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setPDragActive(true);
-                      }}
-                      onDragLeave={() => setPDragActive(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setPDragActive(false);
-                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                          handleImageUpload(e.dataTransfer.files[0], "project");
-                        }
-                      }}
-                      className={`border-2 border-dashed rounded-2xl p-6 transition-all flex flex-col items-center justify-center text-center cursor-pointer relative overflow-hidden ${
-                        pDragActive
-                          ? "border-[#ff5e14] bg-[#ff5e14]/5"
-                          : pImage
-                          ? "border-emerald-200 bg-emerald-50/10 hover:border-[#ff5e14]"
-                          : "border-gray-200 bg-[#f8f9fa] hover:border-[#ff5e14]"
-                      }`}
-                      onClick={() => document.getElementById("project-file-input")?.click()}
-                    >
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Raised Amount ($)</label>
                       <input
-                        type="file"
-                        id="project-file-input"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            handleImageUpload(e.target.files[0], "project");
-                          }
-                        }}
+                        type="number"
+                        value={projRaisedAmount}
+                        onChange={(e) => setProjRaisedAmount(Number(e.target.value))}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                        min="0"
                       />
-                      {pImage ? (
-                        <div className="space-y-4 w-full">
-                          <div className="relative w-full max-w-xs h-36 mx-auto rounded-xl overflow-hidden border border-gray-200 shadow-sm animate-fade-in">
-                            <img
-                              src={pImage}
-                              alt="Preview"
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Location Name</label>
+                      <input
+                        type="text"
+                        value={projLocation}
+                        onChange={(e) => setProjLocation(e.target.value)}
+                        placeholder="e.g. Mek'ele District Foothills"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Launch Date</label>
+                      <input
+                        type="text"
+                        value={projDate}
+                        onChange={(e) => setProjDate(e.target.value)}
+                        placeholder="e.g. 15 July, 2026"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Highlighted option */}
+                  <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <input
+                      type="checkbox"
+                      id="projHighlighted"
+                      checked={projHighlighted}
+                      onChange={(e) => setProjHighlighted(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <label htmlFor="projHighlighted" className="text-sm text-gray-700 font-bold">
+                      Highlight Campaign (Features on top banners and widget selectors)
+                    </label>
+                  </div>
+
+                  {/* Thumbnail Cover Image & File input */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Campaign Cover Image</label>
+                    <div className="flex flex-col sm:flex-row gap-4 items-center bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                      <div className="w-24 h-24 rounded-2xl bg-white border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+                        {projImage ? (
+                          <img src={projImage} alt="Cover preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <Upload className="w-8 h-8 text-gray-300" />
+                        )}
+                      </div>
+                      <div className="flex-grow w-full">
+                        <input
+                          type="text"
+                          value={projImage}
+                          onChange={(e) => setProjImage(e.target.value)}
+                          placeholder="Or paste direct image URL here..."
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 mb-3 bg-white"
+                        />
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-emerald-200 inline-flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5" />
+                            Upload JPG/PNG
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload(e, "project")}
+                              className="hidden"
                             />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <p className="text-white text-xs font-bold font-sans">Click to replace</p>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-500 font-sans flex items-center justify-center gap-1.5">
-                            {pImage.startsWith("data:") ? (
-                              <span className="font-semibold text-emerald-600 flex items-center gap-1">
-                                <CheckCircle className="w-3.5 h-3.5" /> Local Image Loaded
-                              </span>
-                            ) : (
-                              <span className="font-semibold text-[#ff5e14] flex items-center gap-1">
-                                <Link className="w-3.5 h-3.5" /> Web URL Loaded
-                              </span>
-                            )}
-                            <span>• Click area to change</span>
-                          </div>
+                          </label>
+                          <span className="text-xs text-gray-400">(Max 2MB. Converted to secure Base64 format)</span>
                         </div>
-                      ) : (
-                        <div className="space-y-3 py-4">
-                          <div className="w-12 h-12 bg-[#ff5e14]/10 rounded-full flex items-center justify-center text-[#ff5e14] mx-auto animate-pulse">
-                            <Upload className="w-5 h-5" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold text-[#0a1118]">
-                              Click to upload or drag and drop
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              PNG, JPG, JPEG or WEBP (Images under 1.5MB recommended)
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <input
-                        type="url"
-                        placeholder="Enter Unsplash image link or choose preset below"
-                        value={pImage.startsWith("data:") ? "" : pImage}
-                        onChange={(e) => setPImage(e.target.value)}
-                        className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                      />
-                      {/* Preset quick buttons */}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {PRESET_IMAGES.map((img) => (
-                          <button
-                            key={img.label}
-                            type="button"
-                            onClick={() => {
-                              setPImage(img.url);
-                              addToast("info", "Asset Selected", `Loaded image template for: ${img.label}`);
-                            }}
-                            className={`text-[10px] font-display font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                              pImage === img.url
-                                ? "bg-[#ff5e14] text-white border-[#ff5e14]"
-                                : "bg-white text-gray-500 border-gray-200 hover:border-[#ff5e14]"
-                            }`}
-                          >
-                            {img.label}
-                          </button>
-                        ))}
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* 6. Fields: Main Description & Short Tags */}
-                <div className="grid grid-cols-1 gap-5 border-t border-gray-100 pt-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Main Description Overview *</label>
-                    <textarea
-                      required
-                      rows={3}
-                      placeholder="Describe the campaign mission, targeted families, and localized solutions..."
-                      value={pDescription}
-                      onChange={(e) => setPDescription(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl p-4 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans resize-none"
-                    ></textarea>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tags (comma separated)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Pure Water, Family, Emergency Support"
-                      value={pTags}
-                      onChange={(e) => setPTags(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
+
+                  {/* Description Box */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Short Introduction</label>
+                    <textarea
+                      rows={3}
+                      value={projDescription}
+                      onChange={(e) => setProjDescription(e.target.value)}
+                      placeholder="Enter primary pitch, goals, or summary details of the campaign..."
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      required
                     />
                   </div>
-                </div>
 
-                {/* 7. Advanced details: Challenge & Solution, Final Result */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-gray-100 pt-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Logistics Challenge & Solution</label>
-                    <textarea
-                      rows={3}
-                      placeholder="What roadblocks did your team face, and how were they solved?..."
-                      value={pChallengeSolution}
-                      onChange={(e) => setPChallengeSolution(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl p-4 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans resize-none"
-                    ></textarea>
+                  {/* Story parameters */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">The Challenge & Solution Narrative</label>
+                      <textarea
+                        rows={4}
+                        value={projChallengeSolution}
+                        onChange={(e) => setProjChallengeSolution(e.target.value)}
+                        placeholder="What bottlenecks did you face? How was it resolved?"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Final Outcomes & Impact Results</label>
+                      <textarea
+                        rows={4}
+                        value={projFinalResult}
+                        onChange={(e) => setProjFinalResult(e.target.value)}
+                        placeholder="What specific quantitative outputs or milestones have been accomplished?"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Measurable Final Outcome</label>
-                    <textarea
-                      rows={3}
-                      placeholder="What was the lasting result or percentage metric upgrade?..."
-                      value={pFinalResult}
-                      onChange={(e) => setPFinalResult(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl p-4 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans resize-none"
-                    ></textarea>
+
+                  {/* Inline quote */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Inspirational Callout Quote</label>
+                    <input
+                      type="text"
+                      value={projQuote}
+                      onChange={(e) => setProjQuote(e.target.value)}
+                      placeholder="e.g. 'Clean water transforms a settlement's health indicators...'"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                    />
                   </div>
-                </div>
 
-                {/* Featured checkbox */}
-                <div className="flex items-center gap-2.5 pt-2">
-                  <input
-                    type="checkbox"
-                    id="highlighted-toggle"
-                    checked={pHighlighted}
-                    onChange={(e) => setPHighlighted(e.target.checked)}
-                    className="w-4.5 h-4.5 text-[#ff5e14] rounded-sm focus:ring-[#ff5e14]/20 border-gray-300"
-                  />
-                  <label htmlFor="highlighted-toggle" className="text-xs font-display font-extrabold text-secondary uppercase tracking-wide cursor-pointer">
-                    Feature on Frontpage Hero Highlights
-                  </label>
-                </div>
+                  {/* Tags */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Search Tags</label>
+                    <input
+                      type="text"
+                      value={projTags}
+                      onChange={(e) => setProjTags(e.target.value)}
+                      placeholder="e.g. Solar Well, Pure Water, Filtration (comma-separated)"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                    />
+                  </div>
 
-                {/* Footer Buttons */}
-                <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsProjectModalOpen(false)}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-display font-bold text-xs px-5 py-3 rounded-full transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-[#ff5e14] hover:bg-[#ff5e14]/90 text-white font-display font-bold text-xs px-6 py-3 rounded-full shadow-md transition-colors cursor-pointer"
-                  >
-                    {editingProject ? "Apply Updates" : "Deploy Active Campaign"}
-                  </button>
-                </div>
+                  {/* Advanced Multi-section block builder */}
+                  <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                    <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                      <ListPlus className="w-4 h-4 text-emerald-600" />
+                      Detailed Content Sections ({projContentSections.length})
+                    </h3>
+                    
+                    {projContentSections.length > 0 && (
+                      <div className="space-y-3 mb-6">
+                        {projContentSections.map((sec, i) => (
+                          <div key={i} className="flex justify-between items-start bg-white p-4 rounded-xl border border-gray-150">
+                            <div>
+                              <strong className="text-sm text-gray-900 block">{sec.title}</strong>
+                              <p className="text-xs text-gray-500 mt-1">{sec.paragraph}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeContentSection(i)}
+                              className="p-1.5 text-gray-400 hover:text-red-500 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                    <div className="bg-white p-4 rounded-xl border border-gray-150 space-y-3">
+                      <span className="text-xs font-bold text-gray-600 uppercase">Add block:</span>
+                      <input
+                        type="text"
+                        placeholder="Section Title (e.g. Clinical Screen Progress)"
+                        value={tempSecTitle}
+                        onChange={(e) => setTempSecTitle(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs"
+                      />
+                      <textarea
+                        placeholder="Detailed block text paragraphs..."
+                        value={tempSecParagraph}
+                        onChange={(e) => setTempSecParagraph(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs"
+                        rows={2}
+                      />
+                      <button
+                        type="button"
+                        onClick={addContentSection}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-all"
+                      >
+                        Append Content Section
+                      </button>
+                    </div>
+                  </div>
 
-      {/* 2. BLOG CREATION / MODIFICATION MODAL */}
-      <AnimatePresence>
-        {isBlogModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" id="blog-form-modal">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsBlogModalOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-            />
-
-            {/* Modal Body */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-3xl bg-white rounded-[32px] shadow-2xl overflow-hidden max-h-[85vh] flex flex-col border border-gray-100"
-            >
-              {/* Header */}
-              <div className="bg-[#0a1118] text-white p-6 flex items-center justify-between border-b border-white/5">
-                <div>
-                  <h2 className="text-xl font-display font-black">
-                    {editingBlog ? "Modify Journal Article" : "Compose New Public Editorial Journal"}
-                  </h2>
-                  <p className="text-xs text-gray-400 font-sans mt-0.5">
-                    Publish impact reports, transparency diaries, or field announcements.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsBlogModalOpen(false)}
-                  className="p-2 bg-white/10 hover:bg-white/15 text-white/80 rounded-full cursor-pointer transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                  {/* Save actions */}
+                  <div className="flex gap-4 border-t border-gray-100 pt-6">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Save Campaign
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsProjectFormOpen(false)}
+                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
-
-              {/* Scrollable Content */}
-              <form onSubmit={handleSaveBlog} className="p-6 overflow-y-auto space-y-6 flex-1 text-left">
-                
-                {/* 1. Row: Title & Author */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Article Title *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Unlocking Potential: The Water Connection"
-                      value={bTitle}
-                      onChange={(e) => setBTitle(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Author Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Esther Howard"
-                      value={bAuthor}
-                      onChange={(e) => setBAuthor(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
-                </div>
-
-                {/* 2. Row: Category & Date */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Category Category *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Sanitation, Nutrition, Charity"
-                      value={bCategory}
-                      onChange={(e) => setBCategory(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Publish Date Badge</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 11 July, 15 Dec"
-                      value={bDate}
-                      onChange={(e) => setBDate(e.target.value)}
-                      className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Row: Image selection */}
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Cover Image *</label>
-                    <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl text-[10px] font-display font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setBInputMode("file")}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          bInputMode === "file"
-                            ? "bg-white text-[#0a1118] shadow-xs"
-                            : "text-gray-400 hover:text-gray-600"
-                        }`}
-                      >
-                        Local File
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBInputMode("url")}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          bInputMode === "url"
-                            ? "bg-white text-[#0a1118] shadow-xs"
-                            : "text-gray-400 hover:text-gray-600"
-                        }`}
-                      >
-                        Web URL & Presets
-                      </button>
-                    </div>
-                  </div>
-
-                  {bInputMode === "file" ? (
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setBDragActive(true);
-                      }}
-                      onDragLeave={() => setBDragActive(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setBDragActive(false);
-                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                          handleImageUpload(e.dataTransfer.files[0], "blog");
-                        }
-                      }}
-                      className={`border-2 border-dashed rounded-2xl p-6 transition-all flex flex-col items-center justify-center text-center cursor-pointer relative overflow-hidden ${
-                        bDragActive
-                          ? "border-[#ff5e14] bg-[#ff5e14]/5"
-                          : bImage
-                          ? "border-emerald-200 bg-emerald-50/10 hover:border-[#ff5e14]"
-                          : "border-gray-200 bg-[#f8f9fa] hover:border-[#ff5e14]"
-                      }`}
-                      onClick={() => document.getElementById("blog-file-input")?.click()}
-                    >
-                      <input
-                        type="file"
-                        id="blog-file-input"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            handleImageUpload(e.target.files[0], "blog");
-                          }
-                        }}
-                      />
-                      {bImage ? (
-                        <div className="space-y-4 w-full">
-                          <div className="relative w-full max-w-xs h-36 mx-auto rounded-xl overflow-hidden border border-gray-200 shadow-sm animate-fade-in">
-                            <img
-                              src={bImage}
-                              alt="Preview"
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <p className="text-white text-xs font-bold font-sans">Click to replace</p>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-500 font-sans flex items-center justify-center gap-1.5">
-                            {bImage.startsWith("data:") ? (
-                              <span className="font-semibold text-emerald-600 flex items-center gap-1">
-                                <CheckCircle className="w-3.5 h-3.5" /> Local Image Loaded
-                              </span>
-                            ) : (
-                              <span className="font-semibold text-[#ff5e14] flex items-center gap-1">
-                                <Link className="w-3.5 h-3.5" /> Web URL Loaded
-                              </span>
-                            )}
-                            <span>• Click area to change</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3 py-4">
-                          <div className="w-12 h-12 bg-[#ff5e14]/10 rounded-full flex items-center justify-center text-[#ff5e14] mx-auto animate-pulse">
-                            <Upload className="w-5 h-5" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold text-[#0a1118]">
-                              Click to upload or drag and drop
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              PNG, JPG, JPEG or WEBP (Images under 1.5MB recommended)
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <input
-                        type="url"
-                        placeholder="Enter Unsplash image link or choose preset below"
-                        value={bImage.startsWith("data:") ? "" : bImage}
-                        onChange={(e) => setBImage(e.target.value)}
-                        className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                      />
-                      {/* Preset quick buttons */}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {PRESET_IMAGES.map((img) => (
-                          <button
-                            key={img.label}
-                            type="button"
-                            onClick={() => {
-                              setBImage(img.url);
-                              addToast("info", "Asset Selected", `Loaded image template for: ${img.label}`);
-                            }}
-                            className={`text-[10px] font-display font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                              bImage === img.url
-                                ? "bg-[#ff5e14] text-white border-[#ff5e14]"
-                                : "bg-white text-gray-500 border-gray-200 hover:border-[#ff5e14]"
-                            }`}
-                          >
-                            {img.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 4. Row: Excerpt & Quote */}
-                <div className="space-y-1.5 border-t border-gray-100 pt-4">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Short Abstract Excerpt *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Summarize the core impact topic in 1-2 lines..."
-                    value={bExcerpt}
-                    onChange={(e) => setBExcerpt(e.target.value)}
-                    className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Highlighted Quote</label>
-                  <input
-                    type="text"
-                    placeholder="A strong quote that stands out in the center of the article..."
-                    value={bQuote}
-                    onChange={(e) => setBQuote(e.target.value)}
-                    className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                  />
-                </div>
-
-                {/* 5. Row: Tags Comma separated */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tag Keywords (comma separated)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Advocacy, Clean Water, School Support"
-                    value={bTags}
-                    onChange={(e) => setBTags(e.target.value)}
-                    className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl px-4 py-3 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans"
-                  />
-                </div>
-
-                {/* 6. Textarea: Content paragraphs (split by double newline) */}
-                <div className="space-y-1.5 border-t border-gray-100 pt-4">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-                    <span>Full Journal Body Content *</span>
-                    <span className="text-[10px] text-[#ff5e14] font-mono lowercase">Separate paragraphs using a double enter/return</span>
-                  </label>
-                  <textarea
-                    required
-                    rows={8}
-                    placeholder="Type or paste full editorial content here. Use a double newline (Enter twice) to create separate paragraphs..."
-                    value={bContentParagraphs}
-                    onChange={(e) => setBContentParagraphs(e.target.value)}
-                    className="w-full bg-[#f8f9fa] border border-gray-200/80 rounded-xl p-4 text-sm text-[#0a1118] focus:outline-none focus:border-[#ff5e14] font-sans resize-y"
-                  ></textarea>
-                </div>
-
-                {/* Footer Buttons */}
-                <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsBlogModalOpen(false)}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-display font-bold text-xs px-5 py-3 rounded-full transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-[#ff5e14] hover:bg-[#ff5e14]/90 text-white font-display font-bold text-xs px-6 py-3 rounded-full shadow-md transition-colors cursor-pointer"
-                  >
-                    {editingBlog ? "Publish Updates" : "Publish Blog Post"}
-                  </button>
-                </div>
-
-              </form>
-            </motion.div>
+            )}
           </div>
         )}
-      </AnimatePresence>
 
-    </div>
-  );
-}
+        {/* JOURNALS TAB CONTENT */}
+        {activeTab === "blogs" && (
+          <div>
+            {!isBlogFormOpen ? (
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-6 mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Registered Journals & Logs</h2>
+                    <p className="text-sm text-gray-500">Live editorial papers and regional study documents.</p>
+                  </div>
+                  <button
+                    onClick={openNewBlogForm}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Journal
+                  </button>
+                </div>
+
+                {blogs.length === 0 ? (
+                  <div className="text-center py-16 text-gray-400">
+                    <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-base font-bold text-gray-500">No journal posts found in database.</p>
+                    <p className="text-xs text-gray-400 mt-1">Click &quot;Create Journal&quot; to populate your first persistent narrative record.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-xs font-extrabold text-gray-400 uppercase">
+                          <th className="py-4 px-4">Journal Post</th>
+                          <th className="py-4 px-4">Category</th>
+                          <th className="py-4 px-4">Author</th>
+                          <th className="py-4 px-4">Published Date</th>
+                          <th className="py-4 px-4">Comments</th>
+                          <th className="py-4 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {blogs.map((b) => (
+                          <tr key={b.id} className="border-b border-gray-50 last:border-0 text-sm hover:bg-gray-50/50 transition-colors">
+                            <td className="py-4 px-4 flex items-center gap-3">
+                              <img
+                                src={b.image}
+                                alt={b.title}
+                                className="w-12 h-12 object-cover rounded-xl bg-gray-100"
+                              />
+                              <span className="font-bold text-gray-950 block max-w-xs truncate">{b.title}</span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className="bg-gray-100 text-gray-700 font-semibold px-2.5 py-1 rounded-lg text-xs">
+                                {b.category}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 font-medium text-gray-700">{b.author}</td>
+                            <td className="py-4 px-4 text-gray-500">{b.date}</td>
+                            <td className="py-4 px-4 font-bold text-emerald-600">{b.comments ? b.comments.length : 0}</td>
+                            <td className="py-4 px-4 text-right">
+                              <div className="inline-flex gap-2">
+                                <button
+                                  onClick={() => startEditBlog(b)}
+                                  className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteBlog(b.id, b.title)}
+                                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // JOURNAL EDIT / CREATE FORM
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-6 mb-8">
+                  <div>
+                    <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs block mb-1">
+                      Journal Editor
+                    </span>
+                    <h2 className="text-2xl font-black text-gray-900">
+                      {editingBlog ? `Edit: ${editingBlog.title}` : "Create New Journal"}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setIsBlogFormOpen(false)}
+                    className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveBlog} className="space-y-8">
+                  
+                  {/* Grid fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Journal Title</label>
+                      <input
+                        type="text"
+                        value={blogTitle}
+                        onChange={(e) => setBlogTitle(e.target.value)}
+                        placeholder="e.g. School lunch regimes and academic study outcomes"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Category</label>
+                      <select
+                        value={blogCategory}
+                        onChange={(e) => setBlogCategory(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      >
+                        <option value="Donation">Donation</option>
+                        <option value="Medical Care">Medical Care</option>
+                        <option value="Pure Water">Pure Water</option>
+                        <option value="Nutrition">Nutrition</option>
+                        <option value="Education">Education</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Author Name</label>
+                      <input
+                        type="text"
+                        value={blogAuthor}
+                        onChange={(e) => setBlogAuthor(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Publication Date</label>
+                      <input
+                        type="text"
+                        value={blogDate}
+                        onChange={(e) => setBlogDate(e.target.value)}
+                        placeholder="e.g. 15 July"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Thumbnail Cover Image & File input */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Cover Image</label>
+                    <div className="flex flex-col sm:flex-row gap-4 items-center bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                      <div className="w-24 h-24 rounded-2xl bg-white border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+                        {blogImage ? (
+                          <img src={blogImage} alt="Cover preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <Upload className="w-8 h-8 text-gray-300" />
+                        )}
+                      </div>
+                      <div className="flex-grow w-full">
+                        <input
+                          type="text"
+                          value={blogImage}
+                          onChange={(e) => setBlogImage(e.target.value)}
+                          placeholder="Or paste direct cover image URL..."
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 mb-3 bg-white"
+                        />
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-emerald-200 inline-flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5" />
+                            Upload Cover JPG/PNG
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload(e, "blog")}
+                              className="hidden"
+                            />
+                          </label>
+                          <span className="text-xs text-gray-400">(Max 2MB. Converted to secure Base64)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Excerpt */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Short Abstract / Excerpt</label>
+                    <textarea
+                      rows={2}
+                      value={blogExcerpt}
+                      onChange={(e) => setBlogExcerpt(e.target.value)}
+                      placeholder="Enter a 1-2 sentence quick summary snippet..."
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                      required
+                    />
+                  </div>
+
+                  {/* Inline quote */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Callout Quote</label>
+                    <textarea
+                      rows={2}
+                      value={blogQuote}
+                      onChange={(e) => setBlogQuote(e.target.value)}
+                      placeholder="e.g. 'Empowering women with basic boreholes increases class attendance...'"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                    />
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Tags</label>
+                    <input
+                      type="text"
+                      value={blogTags}
+                      onChange={(e) => setBlogTags(e.target.value)}
+                      placeholder="e.g. Education, Pure Water, Community (comma-separated)"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/50"
+                    />
+                  </div>
+
+                  {/* Multi-paragraph narratives list */}
+                  <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                    <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-emerald-600" />
+                      Editorial Narrative Paragraphs ({blogContentParagraphs.length})
+                    </h3>
+                    
+                    {blogContentParagraphs.length > 0 && (
+                      <div className="space-y-3 mb-6">
+                        {blogContentParagraphs.map((par, i) => (
+                          <div key={i} className="flex justify-between items-start bg-white p-4 rounded-xl border border-gray-150">
+                            <p className="text-xs text-gray-600 leading-relaxed">Paragraph {i + 1}: {par}</p>
+                            <button
+                              type="button"
+                              onClick={() => removeBlogParagraph(i)}
+                              className="p-1.5 text-gray-400 hover:text-red-500 rounded shrink-0 ml-4"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="bg-white p-4 rounded-xl border border-gray-150 space-y-3">
+                      <span className="text-xs font-bold text-gray-600 uppercase">Add Paragraph:</span>
+                      <textarea
+                        placeholder="Type full narrative text block here..."
+                        value={tempParagraph}
+                        onChange={(e) => setTempParagraph(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs"
+                        rows={3}
+                      />
+                      <button
+                        type="button"
+                        onClick={addBlogParagraph}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-all"
+                      >
+                        Append Paragraph
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Save actions */}
+                  <div className="flex gap-4 border-t border-gray-100 pt-6">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Save Journal
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsBlogFormOpen(false)}
+                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
+ 
+        {/* CONTACT MESSAGES TAB CONTENT */}
+        {activeTab === "contacts" && (
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden p-6" id="admin-contacts-panel">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-6 mb-6">
+              <div className="text-left">
+                <h2 className="text-xl font-bold text-gray-900">Inbox Messages</h2>
+                <p className="text-sm text-gray-500">Persistent contact queries and messages submitted via the public contact form.</p>
+              </div>
+              <button
+                onClick={fetchContacts}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all"
+                id="refresh-contacts-btn"
+              >
+                Refresh Inbox
+              </button>
+            </div>
+
+            {isContactsLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4" id="contacts-loading-spinner">
+                <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                <p className="text-sm text-gray-500 font-medium">Syncing database messages...</p>
+              </div>
+            ) : contacts.length === 0 ? (
+              <div className="text-center py-16 text-gray-400" id="contacts-empty-state">
+                <Inbox className="w-12 h-12 mx-auto mb-3 text-gray-300 animate-pulse" />
+                <p className="text-base font-bold text-gray-500">Your Inbox is clear.</p>
+                <p className="text-xs text-gray-400 mt-1">When visitors submit messages through the contact form, they will appear here in real time.</p>
+              </div>
+            ) : (
+              <div className="space-y-4" id="contacts-list">
+                {contacts.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`p-6 rounded-2xl border transition-all duration-350 flex flex-col md:flex-row justify-between items-start gap-4 ${
+                      !c.read
+                        ? "bg-emerald-50/20 border-emerald-200/60 shadow-xs animate-pulse-subtle"
+                        : "bg-white border-gray-150 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="space-y-3 flex-1 text-left">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-display font-black text-gray-950 text-base">{c.name}</span>
+                        <span className="text-xs text-gray-400">&lt;{c.email}&gt;</span>
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-mono">{c.date}</span>
+                        {!c.read && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                            New
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Subject</span>
+                        <p className="font-bold text-gray-900 text-sm">{c.subject || "No Subject"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Message</span>
+                        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap font-sans bg-gray-50/50 p-4 rounded-xl border border-gray-100">{c.message}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 self-stretch md:self-auto justify-end shrink-0 pt-2 md:pt-0">
+                      {!c.read && (
+                        <button
+                          onClick={() => handleMarkContactRead(c.id)}
+                          className="p-2.5 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 rounded-xl transition-all font-semibold text-xs flex items-center gap-1"
+                          title="Mark as Read"
+                          id={`mark-read-btn-${c.id}`}
+                        >
+                          <CheckSquare className="w-4 h-4" />
+                          <span>Mark Read</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteContact(c.id)}
+                        className="p-2.5 text-gray-500 hover:text-white hover:bg-red-600 bg-gray-50 rounded-xl transition-all font-semibold text-xs flex items-center gap-1"
+                        title="Delete Message"
+                        id={`delete-msg-btn-${c.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+ 
+       </div>
+     </div>
+   );
+ }

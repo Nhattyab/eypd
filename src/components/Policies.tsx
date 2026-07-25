@@ -4,9 +4,10 @@ import { policiesData, PolicyItem } from "../data/policiesData";
 
 interface PoliciesProps {
   onPolicySelect: (policy: PolicyItem) => void;
+  onViewAllResources?: () => void;
 }
 
-export default function Policies({ onPolicySelect }: PoliciesProps) {
+export default function Policies({ onPolicySelect, onViewAllResources }: PoliciesProps) {
 
   const getBadgeStyles = (type: PolicyItem["type"]) => {
     switch (type) {
@@ -39,12 +40,15 @@ export default function Policies({ onPolicySelect }: PoliciesProps) {
             </p>
           </div>
 
-          <a  
-            className="inline-flex items-center gap-1 text-sm font-display font-black text-[#16a34a] hover:text-white transition-all self-start md:self-end mt-2 md:mt-0 cursor-pointer border-b-2 border-transparent hover:border-[#1e6f3d]"
-          >
-            <span>All Documents</span>
-            <span className="text-base">→</span>
-          </a>
+          {onViewAllResources && (
+            <button 
+              onClick={onViewAllResources}
+              className="inline-flex items-center gap-1 text-sm font-display font-black text-[#1e6f3d] hover:text-[#16a34a] transition-all self-start md:self-end mt-2 md:mt-0 cursor-pointer border-b-2 border-transparent hover:border-[#1e6f3d]"
+            >
+              <span>All Documents</span>
+              <span className="text-base">→</span>
+            </button>
+          )}
         </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 3-Column Grid representing the 6 cards */}

@@ -30,12 +30,12 @@ export default function AboutUs({ onExploreClick }: AboutUsProps) {
               initial={{ scale: 0.9, opacity: 0 }}
               whileInView={{ scale: 1, opacity: 1 }}
               viewport={{ once: true }}
-              className="absolute bottom-6 right-2 md:right-24 bg-[#478b1b] text-white px-4 py-6 rounded-3xl shadow-2xl z-20 text-center max-w-[140px]"
+              className="absolute bottom-6 right-2 md:right-8 bg-[#478b1b] text-white px-8 py-6 rounded-3xl shadow-2xl z-20 text-center max-w-[240px]"
               id="about-floating-experience"
             >
               <div className="font-display font-black text-5xl tracking-tight">9+</div>
               <div className="text-xs font-display font-bold uppercase tracking-wider mt-1.5 leading-snug">
-                Years of Experience
+                Years Of Experience
               </div>
             </motion.div>
           </div>
