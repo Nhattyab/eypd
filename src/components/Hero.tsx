@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Heart, ChevronsRight } from "lucide-react";
+
+import ambulanceImage from "../assets/images/heroimage.jpg";
 // @ts-ignore
 import refugeeChildImage from "../assets/images/refugee_child_portrait_1782472576507.jpg";
 // @ts-ignore
@@ -13,6 +15,7 @@ import medicalHelpImage from "../assets/images/medical_treatment_help_1782473815
 import qualityEducationImage from "../assets/images/quality_education_1782473853014.jpg";
 
 const SLIDESHOW_IMAGES = [
+  { src: ambulanceImage, alt: "Eypd Transport" },
   { src: refugeeChildImage, alt: "Humanitarian Focus Child Portrait" },
   { src: volunteerFoodImage, alt: "Volunteer Food Delivery and Support" },
   { src: pureWaterImage, alt: "Pure Drinking Water Infrastructure" },
@@ -60,9 +63,7 @@ export default function Hero({ onDonateClick, onExploreClick }: HeroProps) {
         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-secondary via-secondary/45 to-transparent z-10" />
         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-primary/50 via-primary/20 to-transparent mix-blend-multiply z-10 pointer-events-none" />
 
-        {/* 2. Left to Right Fade (Fade out on the right edge so it blends into the screen) */}
-        <div className="absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-primary/80 via-secondary/50 to-transparent z-10 pointer-events-none" />
-
+      
         {/* 3. Top and Bottom Fades (Primary and Secondary gradients) */}
         {/* Top Fade (Fade in/out from top) */}
         <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-secondary to-transparent z-10" />
