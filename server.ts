@@ -1,9 +1,26 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import Database from "better-sqlite3";
 import { createServer as createViteServer } from "vite";
 
 const PORT = 3000;
+
+const app = express();
+app.use(express.json({ limit: "50mb" }));
+
+// Serve static assets from src/assets and dist/src/assets
+const srcAssetsDir = path.join(process.cwd(), "src", "assets");
+const distAssetsDir = path.join(process.cwd(), "dist", "src", "assets");
+
+if (fs.existsSync(srcAssetsDir)) {
+  app.use("/src/assets", express.static(srcAssetsDir));
+  app.use("/assets", express.static(srcAssetsDir));
+}
+if (fs.existsSync(distAssetsDir)) {
+  app.use("/src/assets", express.static(distAssetsDir));
+  app.use("/assets", express.static(distAssetsDir));
+}
 
 // Initialize SQLite database
 const dbPath = path.join(process.cwd(), "sqlite.db");
@@ -561,9 +578,6 @@ if (donationsCount.count === 0) {
 
   insertManyDonations(initialDonations);
 }
-
-const app = express();
-app.use(express.json({ limit: "50mb" })); // Support base64 image uploads up to 50mb
 
 // Helper to parse sqlite database record to rich frontend format
 const parseProject = (p: any) => ({
